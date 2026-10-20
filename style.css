@@ -1,4 +1,4 @@
-/* Custom CSS bổ trợ cho giao diện Quản lý Nề nếp & Thi đua */
+/* Custom CSS bổ trợ cho giao diện Quản lý Nề nếp & Học sinh vi phạm */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
 
 :root {
@@ -17,18 +17,18 @@ body {
   min-height: 100vh;
 }
 
-/* Hiệu ứng kính mờ (Glassmorphism nhẹ nhàng) */
+/* Glassmorphism Header */
 .glass-header {
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
-/* Thẻ tab hoạt động */
+/* Tab button active state */
 .tab-btn.active {
   color: #1d4ed8;
   border-bottom: 2px solid #1d4ed8;
-  font-weight: 600;
+  font-weight: 700;
   background-color: #eff6ff;
 }
 
@@ -74,11 +74,11 @@ body {
   border: 1px solid #fdba74;
 }
 
-/* Bảng dữ liệu tùy chỉnh */
+/* Bảng dữ liệu */
 .custom-table th {
   background-color: #f1f5f9;
   color: #334155;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
@@ -95,7 +95,7 @@ body {
   background-color: #f8fafc;
 }
 
-/* Tùy chỉnh thanh cuộn */
+/* Thanh cuộn mượt */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -112,25 +112,6 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
-}
-
-/* Card chọn model AI */
-.model-card {
-  transition: all 0.2s ease;
-  cursor: pointer;
-  border: 2px solid #e2e8f0;
-}
-
-.model-card:hover {
-  border-color: #93c5fd;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
-.model-card.selected {
-  border-color: #2563eb;
-  background-color: #eff6ff;
-  box-shadow: 0 0 0 2px #bfdbfe;
 }
 
 /* Toast thông báo */
@@ -160,16 +141,17 @@ body {
 }
 
 /* ========================================================= */
-/* TỐI ƯU Ô NHẬP GỢI Ý HỌC SINH & GIAO DIỆN MOBILE            */
+/* TỐI ƯU Ô NHẬP GỢI Ý HỌC SINH & LỖI VI PHẠM (MOBILE)       */
 /* ========================================================= */
-.student-search-input, .autocomplete-container input, #manual-student-input {
+.student-search-input, #manual-rule-input {
   font-size: 1.05rem;
   padding: 12px 16px;
   width: 100%;
   border-radius: 0.75rem;
+  transition: all 0.2s ease;
 }
 
-/* Tối ưu giao diện danh sách gợi ý trên mobile */
+/* Gợi ý học sinh */
 .suggestion-dropdown-item {
   display: flex;
   align-items: center;
@@ -201,13 +183,56 @@ body {
   white-space: nowrap;
 }
 
+/* Gợi ý lỗi vi phạm */
+.rule-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  min-height: 48px;
+  transition: all 0.15s ease;
+}
+
+.rule-suggestion-item:hover, .rule-suggestion-item:active {
+  background-color: #fef2f2;
+}
+
+.rule-suggestion-item .rule-name {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.rule-suggestion-item .rule-points {
+  font-weight: 800;
+  font-size: 0.8rem;
+  background-color: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+/* Nút Đăng nhập trên Header */
+#btn-toggle-auth-lock {
+  min-height: 38px;
+  touch-action: manipulation;
+}
+
 @media (max-width: 768px) {
-  .suggestion-dropdown-item {
+  .suggestion-dropdown-item, .rule-suggestion-item {
     padding: 14px 16px;
     font-size: 1.05rem;
   }
-  .suggestion-dropdown-item .student-class {
+  .suggestion-dropdown-item .student-class, .rule-suggestion-item .rule-points {
     font-size: 0.85rem;
   }
+  #btn-toggle-auth-lock {
+    min-height: 44px;
+    padding: 8px 16px;
+    font-size: 0.9rem;
+  }
 }
-

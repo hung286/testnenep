@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "week": 7,
+    "date": "2026-10-20",
+    "student_name": "Nguyễn Bo",
+    "class_name": "11A04",
+    "violation_category": "Không bảng tên",
+    "penalty_points": 0.5,
+    "original_note": "Không bảng tên giờ chào cờ"
+  },
+  {
+    "id": 2,
+    "week": 7,
+    "date": "2026-10-20",
+    "student_name": "H Ti Ra Niê",
+    "class_name": "12C08",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục ngày thứ ba"
+  },
+  {
+    "id": 3,
+    "week": 7,
+    "date": "2026-10-19",
+    "student_name": "Trần Ngọc Vũ",
+    "class_name": "11A07",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học trễ 10 phút"
+  },
+  {
+    "id": 4,
+    "week": 7,
+    "date": "2026-10-19",
+    "student_name": "Lê Âu Kỳ",
+    "class_name": "10B11",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học muộn xe hư"
+  }
+]
