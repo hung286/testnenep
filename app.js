@@ -139,8 +139,8 @@ class DisciplineApp {
       localStorage.setItem('gemini_api_key', DEFAULT_API_KEY);
     }
 
-    this.syncCloudData(true);
     this.setupDateAndTime();
+    this.syncCloudData(true);
     this.setupTabs();
     this.setupEventListeners();
     this.setupSettingsModal();
@@ -248,7 +248,7 @@ class DisciplineApp {
 
     const keyIndicator = document.getElementById('api-key-status-indicator');
     if (keyIndicator) {
-      const hasKey = !!window.geminiService.getApiKey();
+      const hasKey = (window.geminiService && typeof window.geminiService.getApiKey === 'function') ? !!window.geminiService.getApiKey() : true;
       keyIndicator.className = hasKey ? 'w-2 h-2 rounded-full bg-emerald-500' : 'w-2 h-2 rounded-full bg-red-500 animate-ping';
     }
   }
@@ -359,6 +359,9 @@ class DisciplineApp {
     if (logSearch) logSearch.addEventListener('input', () => this.renderLogsTable());
 
     // Nút xuất & copy Nhật ký
+    const btnCloudSync = document.getElementById('btn-cloud-sync');
+    if (btnCloudSync) btnCloudSync.addEventListener('click', () => this.syncCloudData(false));
+
     const btnCopyMdLogs = document.getElementById('btn-copy-markdown-logs');
     if (btnCopyMdLogs) btnCopyMdLogs.addEventListener('click', () => this.copyLogsMarkdown());
 
@@ -889,7 +892,7 @@ class DisciplineApp {
             <div class="suggestion-dropdown-item flex items-center justify-between p-3.5 hover:bg-blue-50 active:bg-blue-100 cursor-pointer border-b border-slate-100 transition select-none"
                  data-student-index="${idx}">
               <div class="flex items-center gap-2.5 pointer-events-none">
-                <span class="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0"></span>
                 <span class="student-name font-bold text-slate-900 text-sm md:text-base">${s.name}</span>
               </div>
               <span class="student-class font-extrabold text-xs md:text-sm bg-blue-100 text-blue-800 border border-blue-300 px-3 py-1 rounded-lg pointer-events-none shrink-0">${s.class}</span>
@@ -946,7 +949,7 @@ class DisciplineApp {
             <div class="rule-suggestion-item flex items-center justify-between p-3.5 hover:bg-rose-50 active:bg-rose-100 cursor-pointer border-b border-slate-100 transition select-none"
                  data-rule-index="${idx}">
               <div class="flex items-center gap-2.5 pointer-events-none">
-                <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></span>
                 <span class="rule-name font-bold text-slate-800 text-sm md:text-base">${r.name}</span>
               </div>
               <span class="rule-points font-extrabold text-xs md:text-sm bg-red-100 text-red-700 border border-red-200 px-3 py-1 rounded-lg pointer-events-none shrink-0">-${r.points}đ</span>
@@ -1115,6 +1118,793 @@ class DisciplineApp {
     }
   }
 
+  // ==================== BẢNG NHẬT KÝ VI PHẠM (TAB 2) ====================
+
+  renderLogsTable() {
+    const tbody = document.getElementById('logs-table-body');
+    const emptyState = document.getElementById('logs-empty-state');
+    const weekFilter = document.getElementById('log-filter-week').value;
+    const classFilter = document.getElementById('log-filter-class').value;
+    const searchQuery = (document.getElementById('log-filter-search').value || '').trim().toLowerCase();
+
+    if (!tbody) return;
+
+    let filtered = this.violations.filter(item => {
+      if (weekFilter !== 'all' && String(item.week) !== String(weekFilter)) return false;
+      if (classFilter !== 'all' && item.class_name !== classFilter) return false;
+      if (searchQuery) {
+        const full = `${item.student_name} ${item.class_name} ${item.violation_category} ${item.original_note}`.toLowerCase();
+        if (!full.includes(searchQuery)) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '';
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    emptyState.classList.add('hidden');
+    tbody.innerHTML = filtered.map((v, idx) => `
+      <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+        <td class="text-center font-bold text-slate-500">${idx + 1}</td>
+        <td class="text-center">
+          <span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">T${v.week}</span>
+        </td>
+        <td class="font-medium text-slate-700">${this.formatDate(v.date)}</td>
+        <td class="font-bold text-slate-900">${v.student_name}</td>
+        <td class="text-center">
+          <span class="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">${v.class_name}</span>
+        </td>
+        <td class="font-semibold text-slate-800">${v.violation_category}</td>
+        <td class="text-center">
+          <span class="text-red-600 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded text-xs">-${v.penalty_points}đ</span>
+        </td>
+        <td class="text-slate-500 text-xs italic">${v.original_note || '-'}</td>
+        <td class="text-center">
+          <button onclick="window.app.deleteViolation(${v.id})" class="text-slate-400 hover:text-red-600 p-1 rounded" title="Xóa bản ghi này">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </td>
+      </tr>
+    `).join('');
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  deleteViolation(id) {
+    this.requirePassword(() => {
+      if (confirm('Bạn có muốn xóa bản ghi vi phạm này?')) {
+        this.violations = this.violations.filter(v => v.id !== id);
+        this.saveViolations();
+        this.renderLogsTable();
+        this.renderEmulationTable();
+        this.showToast('Đã xóa bản ghi vi phạm!', 'info');
+      }
+    });
+  }
+
+  _oldDeleteViolation(id) {
+    if (confirm('Bạn có muốn xóa bản ghi vi phạm này?')) {
+      this.violations = this.violations.filter(v => v.id !== id);
+      this.saveViolations();
+      this.renderLogsTable();
+      this.renderEmulationTable();
+      this.showToast('Đã xóa bản ghi vi phạm!', 'info');
+    }
+  }
+
+  copyLogsMarkdown() {
+    const weekFilter = document.getElementById('log-filter-week').value;
+    const classFilter = document.getElementById('log-filter-class').value;
+    
+    let list = this.violations.filter(v => {
+      if (weekFilter !== 'all' && String(v.week) !== String(weekFilter)) return false;
+      if (classFilter !== 'all' && v.class_name !== classFilter) return false;
+      return true;
+    });
+
+    let md = `| Tuần | Ngày vi phạm | Họ tên | Lớp | Nội dung vi phạm | Điểm trừ | Ghi chú |\n`;
+    md += `|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n`;
+    list.forEach(v => {
+      md += `| ${v.week} | ${this.formatDate(v.date)} | ${v.student_name} | ${v.class_name} | ${v.violation_category} | ${v.penalty_points} | ${v.original_note || ''} |\n`;
+    });
+
+    navigator.clipboard.writeText(md).then(() => {
+      this.showToast('Đã copy bảng Markdown! Bạn có thể dán trực tiếp vào Excel.', 'success');
+    });
+  }
+
+  exportLogsExcel() {
+    if (typeof XLSX === 'undefined') {
+      this.showToast('Thư viện Excel chưa sẵn sàng.', 'error');
+      return;
+    }
+
+    const data = this.violations.map((v, idx) => ({
+      'STT': idx + 1,
+      'Tuần': v.week,
+      'Ngày vi phạm': this.formatDate(v.date),
+      'Họ và Tên': v.student_name,
+      'Lớp': v.class_name,
+      'Nội dung vi phạm': v.violation_category,
+      'Điểm trừ': v.penalty_points,
+      'Ghi chú': v.original_note || ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'NhatKyViPham');
+    XLSX.writeFile(wb, `NhatKyViPham_THPT_LeHongPhong_${new Date().toISOString().split('T')[0]}.xlsx`);
+    this.showToast('Đã tải xuống file Excel Nhật ký vi phạm!', 'success');
+  }
+
+  // ==================== BẢNG XẾP HẠNG & THI ĐUA (TAB 3) ====================
+
+  calculateEmulationData(selectedWeek) {
+    // Thu thập tất cả 29 lớp
+    const uniqueClasses = Array.from(new Set(this.students.map(s => s.class))).sort();
+    
+    // Lọc vi phạm theo tuần
+    const relevantViolations = this.violations.filter(v => {
+      if (selectedWeek === 'all') return true;
+      return String(v.week) === String(selectedWeek);
+    });
+
+    // Thống kê theo lớp
+    const classStats = {};
+    uniqueClasses.forEach(c => {
+      classStats[c] = {
+        className: c,
+        totalErrors: 0,
+        totalPenalty: 0.0,
+        details: []
+      };
+    });
+
+    relevantViolations.forEach(v => {
+      if (!classStats[v.class_name]) {
+        classStats[v.class_name] = {
+          className: v.class_name,
+          totalErrors: 0,
+          totalPenalty: 0.0,
+          details: []
+        };
+      }
+      classStats[v.class_name].totalErrors += 1;
+      classStats[v.class_name].totalPenalty += parseFloat(v.penalty_points) || 0;
+      classStats[v.class_name].details.push(v);
+    });
+
+    // Chuyển sang mảng và xếp hạng: Ít điểm trừ nhất xếp HẠNG 1
+    const ranked = Object.values(classStats).sort((a, b) => {
+      if (a.totalPenalty !== b.totalPenalty) {
+        return a.totalPenalty - b.totalPenalty; // ít điểm phạt hơn xếp trên
+      }
+      return a.totalErrors - b.totalErrors; // ít lỗi hơn xếp trên
+    });
+
+    // Gán thứ hạng
+    ranked.forEach((item, index) => {
+      item.rank = index + 1;
+      if (item.totalPenalty === 0) {
+        item.status = 'Xuất sắc';
+        item.statusClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
+        item.comment = 'Giữ vững nề nếp hoàn hảo, không có lỗi vi phạm.';
+      } else if (item.totalPenalty <= 2.0) {
+        item.status = 'Tốt';
+        item.statusClass = 'bg-blue-100 text-blue-800 border-blue-300';
+        item.comment = 'Thực hiện tốt nội quy, duy trì phong độ thi đua.';
+      } else if (item.totalPenalty <= 4.0) {
+        item.status = 'Khá';
+        item.statusClass = 'bg-amber-100 text-amber-800 border-amber-300';
+        item.comment = 'Cần lưu ý nhắc nhở các học sinh vi phạm giờ giấc / đồng phục.';
+      } else {
+        item.status = 'Trung bình';
+        item.statusClass = 'bg-red-100 text-red-800 border-red-300';
+        item.comment = 'Nhiều lỗi vi phạm trong tuần, GVCN cần chấn chỉnh nề nếp.';
+      }
+    });
+
+    return ranked;
+  }
+
+  renderEmulationTable() {
+    const tbody = document.getElementById('emulation-table-body');
+    const emuWeek = document.getElementById('emulation-select-week').value;
+    const title = document.getElementById('emulation-table-title');
+
+    if (!tbody) return;
+
+    if (title) {
+      title.textContent = emuWeek === 'all' ? 
+        'Bảng Tổng Hợp & Xếp Hạng Thi Đua Toàn Năm Học' : 
+        `Bảng Tổng Hợp & Xếp Hạng Thi Đua - TUẦN ${emuWeek}`;
+    }
+
+    const ranked = this.calculateEmulationData(emuWeek);
+
+    tbody.innerHTML = ranked.map(item => {
+      let rankBadge = `<span class="font-bold text-slate-700">${item.rank}</span>`;
+      if (item.rank === 1) rankBadge = `<span class="rank-1 px-2.5 py-1 rounded-full font-extrabold text-xs shadow-xs">🥇 Hạng 1</span>`;
+      else if (item.rank === 2) rankBadge = `<span class="rank-2 px-2.5 py-1 rounded-full font-extrabold text-xs shadow-xs">🥈 Hạng 2</span>`;
+      else if (item.rank === 3) rankBadge = `<span class="rank-3 px-2.5 py-1 rounded-full font-extrabold text-xs shadow-xs">🥉 Hạng 3</span>`;
+
+      return `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="text-center">${rankBadge}</td>
+          <td class="font-bold text-slate-900">${item.className}</td>
+          <td class="text-center font-semibold text-slate-700">${item.totalErrors}</td>
+          <td class="text-center">
+            <span class="${item.totalPenalty > 0 ? 'text-red-600 bg-red-50 border border-red-200' : 'text-emerald-600 bg-emerald-50 border border-emerald-200'} font-bold px-2.5 py-1 rounded-lg text-xs">
+              -${item.totalPenalty.toFixed(1)}đ
+            </span>
+          </td>
+          <td class="text-center">
+            <span class="text-xs font-bold border px-2.5 py-0.5 rounded-full ${item.statusClass}">
+              ${item.status}
+            </span>
+          </td>
+          <td class="text-xs text-slate-600">${item.comment}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  updateCharts() {
+    const emuWeek = document.getElementById('emulation-select-week').value;
+    const ranked = this.calculateEmulationData(emuWeek);
+
+    // 1. Bar Chart: Penalty Points
+    const ctxBar = document.getElementById('chart-class-penalties');
+    if (ctxBar && window.Chart) {
+      if (this.classPenaltyChart) this.classPenaltyChart.destroy();
+
+      // Hiển thị 15 lớp có điểm trừ cao nhất hoặc các lớp dẫn đầu
+      const chartLabels = ranked.map(r => r.className);
+      const chartData = ranked.map(r => r.totalPenalty);
+
+      this.classPenaltyChart = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+          labels: chartLabels,
+          datasets: [{
+            label: 'Tổng điểm trừ',
+            data: chartData,
+            backgroundColor: chartData.map(v => v === 0 ? '#10b981' : (v <= 2 ? '#3b82f6' : '#ef4444')),
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { stepSize: 1 }
+            },
+            x: {
+              ticks: { font: { size: 10 } }
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Doughnut Chart: Top Errors
+    const ctxPie = document.getElementById('chart-top-errors');
+    if (ctxPie && window.Chart) {
+      if (this.topErrorsChart) this.topErrorsChart.destroy();
+
+      const errorCounts = {};
+      const relevant = this.violations.filter(v => emuWeek === 'all' || String(v.week) === String(emuWeek));
+      relevant.forEach(v => {
+        errorCounts[v.violation_category] = (errorCounts[v.violation_category] || 0) + 1;
+      });
+
+      const sortedErrors = Object.entries(errorCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const pieLabels = sortedErrors.map(e => e[0]);
+      const pieData = sortedErrors.map(e => e[1]);
+
+      if (pieLabels.length === 0) {
+        pieLabels.push('Không có lỗi');
+        pieData.push(1);
+      }
+
+      this.topErrorsChart = new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+          labels: pieLabels,
+          datasets: [{
+            data: pieData,
+            backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#10b981']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+          }
+        }
+      });
+    }
+  }
+
+  copyEmulationMarkdown() {
+    const emuWeek = document.getElementById('emulation-select-week').value;
+    const ranked = this.calculateEmulationData(emuWeek);
+
+    let md = `| Xếp hạng | Lớp | Tổng số lỗi | Tổng điểm trừ | Trạng thái |\n`;
+    md += `|:---:|:---:|:---:|:---:|:---:|\n`;
+    ranked.forEach(r => {
+      md += `| ${r.rank} | ${r.className} | ${r.totalErrors} | -${r.totalPenalty.toFixed(1)} | ${r.status} |\n`;
+    });
+
+    navigator.clipboard.writeText(md).then(() => {
+      this.showToast('Đã copy Bảng Xếp Hạng Thi Đua Markdown!', 'success');
+    });
+  }
+
+  exportEmulationExcel() {
+    if (typeof XLSX === 'undefined') {
+      this.showToast('Thư viện Excel chưa sẵn sàng.', 'error');
+      return;
+    }
+
+    const emuWeek = document.getElementById('emulation-select-week').value;
+    const ranked = this.calculateEmulationData(emuWeek);
+
+    const data = ranked.map(r => ({
+      'Xếp hạng': r.rank,
+      'Lớp': r.className,
+      'Tổng số lỗi vi phạm': r.totalErrors,
+      'Tổng điểm trừ': r.totalPenalty,
+      'Xếp loại': r.status,
+      'Đánh giá nề nếp': r.comment
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    const sheetName = emuWeek === 'all' ? 'ThiDua_CaNam' : `ThiDua_Tuan_${emuWeek}`;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `BaoCao_ThiDua_THPT_LeHongPhong_${sheetName}.xlsx`);
+    this.showToast('Đã tải xuống file Báo cáo xếp hạng thi đua!', 'success');
+  }
+
+  // ==================== QUẢN LÝ HỌC SINH (TAB 4 - NGUỒN MỞ) ====================
+
+  renderStudentsTable() {
+    const tbody = document.getElementById('students-table-body');
+    const countSpan = document.getElementById('student-table-count');
+    const searchVal = (document.getElementById('student-search-query').value || '').trim().toLowerCase();
+    const classVal = document.getElementById('student-filter-class').value;
+
+    if (!tbody) return;
+
+    let filtered = this.students.filter(s => {
+      if (classVal !== 'all' && s.class !== classVal) return false;
+      if (searchVal && !s.name.toLowerCase().includes(searchVal)) return false;
+      return true;
+    });
+
+    if (countSpan) countSpan.textContent = filtered.length;
+
+    // Giới hạn hiển thị 200 bản ghi đầu tiên nếu quá nhiều để cuộn mượt mà
+    const displayList = filtered.slice(0, 200);
+
+    tbody.innerHTML = displayList.map((s, idx) => `
+      <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+        <td class="text-center text-slate-400 text-xs">${idx + 1}</td>
+        <td class="text-center">
+          <span class="font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-xs">${s.class}</span>
+        </td>
+        <td class="font-semibold text-slate-900">${s.name}</td>
+        <td class="text-center text-slate-600 text-xs">${s.gender || '-'}</td>
+        <td class="text-center font-mono text-[11px] text-slate-400">#${s.id}</td>
+        <td class="text-center">
+          <div class="flex items-center justify-center gap-1.5">
+            <button onclick="window.app.editStudent(${s.id})" class="text-slate-400 hover:text-blue-600 p-1" title="Sửa học sinh">
+              <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+            </button>
+            <button onclick="window.app.deleteStudent(${s.id})" class="text-slate-400 hover:text-red-600 p-1" title="Xóa học sinh">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    if (filtered.length > 200) {
+      tbody.innerHTML += `
+        <tr>
+          <td colspan="6" class="text-center py-3 text-xs text-slate-400 italic bg-slate-50">
+            ... Đang hiển thị 200 / ${filtered.length} học sinh. Hãy sử dụng thanh tìm kiếm hoặc lọc theo lớp để thu hẹp danh sách.
+          </td>
+        </tr>
+      `;
+    }
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  openStudentModal(student = null) {
+    this.editingStudentId = student ? student.id : null;
+    const modal = document.getElementById('modal-student');
+    const title = document.getElementById('modal-student-title');
+    const classInput = document.getElementById('modal-student-class');
+    const nameInput = document.getElementById('modal-student-name');
+    const genderSelect = document.getElementById('modal-student-gender');
+
+    if (student) {
+      title.textContent = 'Chỉnh Sửa Thông Tin Học Sinh';
+      classInput.value = student.class;
+      nameInput.value = student.name;
+      genderSelect.value = student.gender || 'Nam';
+    } else {
+      title.textContent = 'Thêm Học Sinh Mới';
+      classInput.value = '';
+      nameInput.value = '';
+      genderSelect.value = 'Nam';
+    }
+
+    modal.classList.remove('hidden');
+    nameInput.focus();
+  }
+
+  saveStudentModal() {
+    const className = (document.getElementById('modal-student-class').value || '').trim().toUpperCase();
+    const name = (document.getElementById('modal-student-name').value || '').trim();
+    const gender = document.getElementById('modal-student-gender').value;
+
+    if (!className || !name) {
+      this.showToast('Vui lòng nhập đầy đủ Lớp và Họ tên học sinh.', 'warning');
+      return;
+    }
+
+    if (this.editingStudentId) {
+      const idx = this.students.findIndex(s => s.id === this.editingStudentId);
+      if (idx !== -1) {
+        this.students[idx].class = className;
+        this.students[idx].name = name;
+        this.students[idx].gender = gender;
+        this.showToast('Đã cập nhật học sinh thành công!', 'success');
+      }
+    } else {
+      const newId = this.students.length > 0 ? Math.max(...this.students.map(s => s.id || 0)) + 1 : 1;
+      this.students.push({
+        id: newId,
+        class: className,
+        name: name,
+        gender: gender
+      });
+      this.showToast('Đã thêm học sinh mới vào danh sách!', 'success');
+    }
+
+    this.saveStudents();
+    this.populateDropdowns();
+    this.renderStudentsTable();
+    document.getElementById('modal-student').classList.add('hidden');
+  }
+
+  editStudent(id) {
+    const s = this.students.find(item => item.id === id);
+    if (s) this.openStudentModal(s);
+  }
+
+  deleteStudent(id) {
+    if (confirm('Bạn có chắc muốn xóa học sinh này khỏi danh sách trường?')) {
+      this.students = this.students.filter(s => s.id !== id);
+      this.saveStudents();
+      this.populateDropdowns();
+      this.renderStudentsTable();
+      this.showToast('Đã xóa học sinh.', 'info');
+    }
+  }
+
+  exportStudentsExcel() {
+    if (typeof XLSX === 'undefined') return;
+    const data = this.students.map(s => ({
+      'Mã Lớp': s.class,
+      'Họ và Tên': s.name,
+      'Giới Tính': s.gender || '',
+      'ID': s.id
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'DanhSachHocSinh');
+    XLSX.writeFile(wb, `DanhSachHocSinh_THPT_LeHongPhong.xlsx`);
+    this.showToast('Đã xuất danh sách học sinh ra file Excel!', 'success');
+  }
+
+  handleExcelFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // Tìm sheet chứa học sinh: DMKH hoặc Sheet1 hoặc sheet đầu tiên
+        let sheetName = workbook.SheetNames.find(n => n.toUpperCase().includes('DMKH') || n.toUpperCase().includes('HOC SINH')) || workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        const parsedStudents = [];
+        // Duyệt các dòng tìm lớp và họ tên
+        for (let r = 0; r < rows.length; r++) {
+          const row = rows[r];
+          if (!row || row.length < 2) continue;
+          
+          // Kiểm tra xem có cột lớp và họ tên không
+          const col0 = String(row[0] || '').trim();
+          const col1 = String(row[1] || '').trim();
+          const col2 = String(row[2] || '').trim();
+
+          // Lớp thường có dạng 10B01, 11A04, 12C03 hoặc tương tự
+          if (col0.match(/^[0-9]{1,2}[A-Za-z0-9]+$/) && col1.length >= 3 && !col1.toLowerCase().includes('tên')) {
+            parsedStudents.push({
+              id: parsedStudents.length + 1,
+              class: col0,
+              name: col1,
+              gender: col2.toLowerCase().includes('nam') ? 'Nam' : (col2.toLowerCase().includes('nữ') ? 'Nữ' : '')
+            });
+          }
+        }
+
+        if (parsedStudents.length === 0) {
+          alert('Không tìm thấy dữ liệu học sinh phù hợp trong file Excel. Vui lòng kiểm tra định dạng cột (Cột 1: Lớp, Cột 2: Họ tên).');
+          return;
+        }
+
+        this.importPreviewData = parsedStudents;
+        document.getElementById('import-preview-count').textContent = `${parsedStudents.length} học sinh`;
+        document.getElementById('import-preview-box').classList.remove('hidden');
+        document.getElementById('btn-confirm-import-students').disabled = false;
+
+      } catch (err) {
+        console.error('Lỗi đọc Excel:', err);
+        alert('Lỗi đọc file Excel: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  executeStudentImport() {
+    if (!this.importPreviewData || this.importPreviewData.length === 0) return;
+
+    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+    if (mode === 'replace') {
+      this.students = this.importPreviewData;
+    } else {
+      const maxId = this.students.length > 0 ? Math.max(...this.students.map(s => s.id || 0)) : 0;
+      this.importPreviewData.forEach((s, i) => {
+        s.id = maxId + i + 1;
+        this.students.push(s);
+      });
+    }
+
+    this.saveStudents();
+    this.populateDropdowns();
+    this.renderStudentsTable();
+    document.getElementById('modal-import-students').classList.add('hidden');
+    this.showToast(`Đã nạp thành công ${this.importPreviewData.length} học sinh vào hệ thống!`, 'success');
+  }
+
+  // ==================== QUẢN LÝ QUY ĐỊNH LỖI (TAB 5 - NGUỒN MỞ) ====================
+
+  renderRulesTable() {
+    const tbody = document.getElementById('rules-table-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = this.rules.map((r, idx) => {
+      let severityBadge = `<span class="bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full">Nhẹ (-0.5đ)</span>`;
+      if (r.points >= 2.0) {
+        severityBadge = `<span class="bg-red-100 text-red-800 text-[11px] font-bold px-2 py-0.5 rounded-full">Rất nặng (-${r.points}đ)</span>`;
+      } else if (r.points >= 1.0) {
+        severityBadge = `<span class="bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full">Nghiêm trọng (-${r.points}đ)</span>`;
+      }
+
+      return `
+        <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+          <td class="text-center text-slate-400 text-xs">${idx + 1}</td>
+          <td class="font-bold text-slate-900">${r.name}</td>
+          <td class="text-center font-bold text-red-600 bg-red-50/50">-${r.points} điểm</td>
+          <td class="text-center">${severityBadge}</td>
+          <td class="text-center">
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.app.editRule(${r.id})" class="text-slate-400 hover:text-blue-600 p-1" title="Sửa quy định">
+                <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="window.app.deleteRule(${r.id})" class="text-slate-400 hover:text-red-600 p-1" title="Xóa quy định">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  openRuleModal(rule = null) {
+    this.editingRuleId = rule ? rule.id : null;
+    const modal = document.getElementById('modal-rule');
+    const title = document.getElementById('modal-rule-title');
+    const nameInput = document.getElementById('modal-rule-name');
+    const pointsInput = document.getElementById('modal-rule-points');
+
+    if (rule) {
+      title.textContent = 'Chỉnh Sửa Quy Định Lỗi';
+      nameInput.value = rule.name;
+      pointsInput.value = rule.points;
+    } else {
+      title.textContent = 'Thêm Quy Định Lỗi Vi Phạm Mới';
+      nameInput.value = '';
+      pointsInput.value = '0.5';
+    }
+
+    modal.classList.remove('hidden');
+    nameInput.focus();
+  }
+
+  saveRuleModal() {
+    const name = (document.getElementById('modal-rule-name').value || '').trim();
+    const points = parseFloat(document.getElementById('modal-rule-points').value) || 0.5;
+
+    if (!name) {
+      this.showToast('Vui lòng nhập tên quy định lỗi vi phạm.', 'warning');
+      return;
+    }
+
+    if (this.editingRuleId) {
+      const idx = this.rules.findIndex(r => r.id === this.editingRuleId);
+      if (idx !== -1) {
+        this.rules[idx].name = name;
+        this.rules[idx].points = points;
+        this.showToast('Đã cập nhật quy định lỗi!', 'success');
+      }
+    } else {
+      const newId = this.rules.length > 0 ? Math.max(...this.rules.map(r => r.id || 0)) + 1 : 1;
+      this.rules.push({
+        id: newId,
+        name: name,
+        points: points
+      });
+      this.showToast('Đã thêm quy định lỗi mới!', 'success');
+    }
+
+    this.saveRules();
+    this.populateDropdowns();
+    this.renderRulesTable();
+    document.getElementById('modal-rule').classList.add('hidden');
+  }
+
+  editRule(id) {
+    const r = this.rules.find(item => item.id === id);
+    if (r) this.openRuleModal(r);
+  }
+
+  deleteRule(id) {
+    if (confirm('Bạn có chắc muốn xóa lỗi này khỏi danh mục quy chế?')) {
+      this.rules = this.rules.filter(r => r.id !== id);
+      this.saveRules();
+      this.populateDropdowns();
+      this.renderRulesTable();
+      this.showToast('Đã xóa quy định lỗi.', 'info');
+    }
+  }
+
+  // ==================== CÀI ĐẶT MODEL & API KEY (THEO AI_INSTRUCTIONS) ====================
+
+  setupSettingsModal() {
+    const btnOpen = document.getElementById('btn-open-settings');
+    const modal = document.getElementById('modal-settings');
+    const btnClose = document.getElementById('btn-close-settings');
+    const btnCancel = document.getElementById('btn-cancel-settings');
+    const btnSave = document.getElementById('btn-save-settings');
+    const btnDelete = document.getElementById('btn-delete-api-key');
+    const btnToggle = document.getElementById('btn-toggle-key-visibility');
+
+    if (btnOpen) btnOpen.addEventListener('click', () => this.openSettingsModal());
+    if (btnClose) btnClose.addEventListener('click', () => modal.classList.add('hidden'));
+    if (btnCancel) btnCancel.addEventListener('click', () => modal.classList.add('hidden'));
+
+    if (btnToggle) {
+      btnToggle.addEventListener('click', () => {
+        const inp = document.getElementById('input-api-key');
+        if (inp.type === 'password') {
+          inp.type = 'text';
+          btnToggle.innerHTML = `<i data-lucide="eye-off" class="w-4 h-4"></i>`;
+        } else {
+          inp.type = 'password';
+          btnToggle.innerHTML = `<i data-lucide="eye" class="w-4 h-4"></i>`;
+        }
+        if (window.lucide) window.lucide.createIcons();
+      });
+    }
+
+    // Model Cards click
+    const cards = document.querySelectorAll('.model-card');
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        const modelId = card.getAttribute('data-model');
+        this.selectModelCard(modelId);
+      });
+    });
+
+    if (btnSave) {
+      btnSave.addEventListener('click', () => {
+        const key = document.getElementById('input-api-key').value.trim();
+        const selectedRadio = document.querySelector('input[name="radio-model"]:checked');
+        const modelId = selectedRadio ? selectedRadio.value : 'gemini-3-flash-preview';
+
+        window.geminiService.setApiKey(key);
+        window.geminiService.setSelectedModel(modelId);
+
+        document.getElementById('display-current-model-tag').textContent = modelId;
+        this.updateBadges();
+        modal.classList.add('hidden');
+        this.showToast('Đã lưu thiết lập Gemini API Key và Model thành công!', 'success');
+      });
+    }
+
+    if (btnDelete) {
+      btnDelete.addEventListener('click', () => {
+        if (confirm('Xóa API Key khỏi trình duyệt này?')) {
+          window.geminiService.setApiKey('');
+          document.getElementById('input-api-key').value = '';
+          this.updateBadges();
+          modal.classList.add('hidden');
+          this.showToast('Đã xóa API Key.', 'info');
+        }
+      });
+    }
+  }
+
+  openSettingsModal() {
+    const modal = document.getElementById('modal-settings');
+    const inputKey = document.getElementById('input-api-key');
+    inputKey.value = window.geminiService.getApiKey();
+
+    const currentModel = window.geminiService.getSelectedModel();
+    this.selectModelCard(currentModel);
+
+    modal.classList.remove('hidden');
+    inputKey.focus();
+  }
+
+  selectModelCard(modelId) {
+    document.querySelectorAll('.model-card').forEach(card => {
+      const isMatch = card.getAttribute('data-model') === modelId;
+      const radio = card.querySelector('input[type="radio"]');
+      if (isMatch) {
+        card.classList.add('selected');
+        if (radio) radio.checked = true;
+      } else {
+        card.classList.remove('selected');
+        if (radio) radio.checked = false;
+      }
+    });
+  }
+
+  checkApiKeyPrompt() {
+    const key = window.geminiService.getApiKey();
+    if (!key) {
+      // AI_INSTRUCTIONS: "Khi chưa có key, hiển thị Modal bắt buộc nhập"
+      setTimeout(() => {
+        this.openSettingsModal();
+      }, 500);
+    }
+  }
+
   // ==================== BẢO VỆ MẬT KHẨU NHẬP LIỆU (lhp38) ====================
 
   setupPasswordAuth() {
@@ -1172,7 +1962,7 @@ class DisciplineApp {
   }
 
   isDataEntryUnlocked() {
-    return sessionStorage.getItem('data_entry_unlocked') === 'true' || localStorage.getItem('data_entry_unlocked') === 'true';
+    return sessionStorage.getItem('data_entry_unlocked') === 'true';
   }
 
   updateLockStatusUI() {
@@ -1193,6 +1983,29 @@ class DisciplineApp {
         ? 'flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer'
         : 'flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer';
     }
+
+    const btnManualAdd = document.getElementById('btn-manual-add');
+    if (btnManualAdd) {
+      if (isUnlocked) {
+        btnManualAdd.innerHTML = `<i data-lucide="plus-circle" class="w-5 h-5 pointer-events-none"></i><span>Thêm Lỗi</span>`;
+        btnManualAdd.className = 'w-full text-sm font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 rounded-xl transition shadow-md shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer';
+      } else {
+        btnManualAdd.innerHTML = `<i data-lucide="lock" class="w-4 h-4 pointer-events-none text-amber-300"></i><span>Thêm Lỗi (Cần Đăng Nhập)</span>`;
+        btnManualAdd.className = 'w-full text-sm font-bold bg-slate-700 hover:bg-slate-800 text-slate-200 p-3.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer';
+      }
+    }
+
+    const btnRunAi = document.getElementById('btn-run-ai-parse');
+    if (btnRunAi) {
+      if (isUnlocked) {
+        btnRunAi.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4 pointer-events-none"></i><span>Bắt Đầu Chuẩn Hóa Bằng AI</span>`;
+        btnRunAi.className = 'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-500/25 cursor-pointer';
+      } else {
+        btnRunAi.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5 pointer-events-none text-amber-300"></i><span>Bắt Đầu Chuẩn Hóa AI (Cần Đăng Nhập)</span>`;
+        btnRunAi.className = 'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-slate-200 text-xs font-bold rounded-xl transition shadow-sm cursor-pointer';
+      }
+    }
+
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -1245,10 +2058,11 @@ class DisciplineApp {
 
     if (entered === this.PASSWORD_CONFIG) {
       sessionStorage.setItem('data_entry_unlocked', 'true');
-      localStorage.setItem('data_entry_unlocked', 'true');
       this.updateLockStatusUI();
-      this.closePasswordModal();
       this.showToast('Đăng nhập thành công!', 'success');
+      setTimeout(() => {
+        this.closePasswordModal();
+      }, 500);
 
       if (typeof this.pendingAction === 'function') {
         const action = this.pendingAction;
@@ -1373,6 +2187,7 @@ class DisciplineApp {
 }
 
 // Khởi chạy ứng dụng ngay khi sẵn sàng
+window.DisciplineApp = DisciplineApp;
 function initApp() {
   if (!window.app) {
     window.app = new DisciplineApp();
