@@ -1,0 +1,19 @@
+{
+  "name": "quanlinenep",
+  "version": "1.0.0",
+  "description": "He thong quan ly ne nep & thi dua hoc duong THPT Le Hong Phong",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "education",
+    "discipline",
+    "school-management",
+    "gemini-ai",
+    "google-auth"
+  ],
+  "author": "Ban Thi Dua - THPT Le Hong Phong",
+  "license": "MIT"
+}
