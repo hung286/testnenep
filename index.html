@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hệ thống Quản lý Nề nếp & Thi đua Học đường - THPT Lê Hồng Phong</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- SheetJS for Excel Import/Export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Chart.js for Visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="glass-header sticky top-0 z-40 border-b border-slate-200 px-4 lg:px-8 py-3.5 transition-all shadow-sm">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+      
+      <!-- Brand & School Info -->
+      <div class="flex items-center gap-3.5 w-full md:w-auto">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i data-lucide="shield-check" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold tracking-wider uppercase text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Ban Thi Đua - Giám Thị</span>
+            <span class="text-xs text-slate-400">|</span>
+            <span class="text-xs font-medium text-slate-500">THPT Lê Hồng Phong</span>
+          </div>
+          <h1 class="text-base md:text-lg font-bold text-slate-900 leading-tight">Điều Phối Nề Nếp & Thi Đua Học Đường</h1>
+        </div>
+      </div>
+
+      <!-- Action & Time Info -->
+      <div class="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+        
+        <!-- Live Academic Week Badge -->
+        <div class="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-xs text-xs font-medium text-slate-700">
+          <i data-lucide="calendar" class="w-4 h-4 text-blue-600"></i>
+          <span id="header-today-display">Đang tính...</span>
+          <span class="bg-blue-600 text-white font-bold px-2 py-0.5 rounded-full" id="header-week-display">Tuần 7</span>
+        </div>
+
+        <!-- Red Link for API Key as required by AI_INSTRUCTIONS -->
+        <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer" 
+           class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-300 rounded-lg px-3 py-1.5 transition shadow-xs group">
+          <i data-lucide="key" class="w-3.5 h-3.5 text-red-500 group-hover:scale-110 transition-transform"></i>
+          <span>Lấy API key để sử dụng app</span>
+          <i data-lucide="external-link" class="w-3 h-3 text-red-400"></i>
+        </a>
+
+        <!-- Settings Button -->
+        <button id="btn-open-settings" 
+                class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-xs">
+          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+          <span>Cài đặt AI</span>
+          <span id="api-key-status-indicator" class="w-2 h-2 rounded-full bg-amber-400"></span>
+        </button>
+
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== NAVIGATION TABS ==================== -->
+  <nav class="bg-white border-b border-slate-200 sticky top-[73px] z-30">
+    <div class="max-w-7xl mx-auto px-4 lg:px-8">
+      <div class="flex overflow-x-auto space-x-1 py-1 no-scrollbar text-sm font-medium">
+        
+        <button data-tab="tab-ai-logger" class="tab-btn active flex items-center gap-2 px-4 py-2.5 rounded-t-lg transition border-b-2">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span>Bộ Não AI Giám Thị</span>
+        </button>
+
+        <button data-tab="tab-violation-logs" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
+          <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+          <span>Nhật Ký Vi Phạm</span>
+          <span id="badge-total-violations" class="bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+        </button>
+
+        <button data-tab="tab-emulation" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
+          <i data-lucide="trophy" class="w-4 h-4"></i>
+          <span>Xếp Hạng & Thi Đua</span>
+        </button>
+
+        <button data-tab="tab-students" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>Quản Lý Học Sinh</span>
+          <span id="badge-total-students" class="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-bold">1226</span>
+        </button>
+
+        <button data-tab="tab-rules" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
+          <i data-lucide="book-open" class="w-4 h-4"></i>
+          <span>Danh Mục Lỗi & Điểm</span>
+          <span id="badge-total-rules" class="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-bold">33</span>
+        </button>
+
+      </div>
+    </div>
+  </nav>
+
+  <!-- ==================== MAIN CONTENT CONTAINER ==================== -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-8">
+
+    <!-- Global API Error Banner (raw API error displayed in red as required by AI_INSTRUCTIONS) -->
+    <div id="global-error-banner" class="hidden mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl shadow-xs animate-shake">
+      <div class="flex items-start gap-3">
+        <i data-lucide="alert-octagon" class="w-5 h-5 text-red-600 shrink-0 mt-0.5"></i>
+        <div class="flex-1">
+          <h3 class="text-sm font-bold text-red-800">Lỗi Gọi AI (API Error)</h3>
+          <p id="global-error-message" class="text-xs text-red-700 font-mono mt-1 break-all bg-red-100/60 p-2 rounded"></p>
+          <div class="mt-2 text-xs text-red-600 flex items-center gap-3">
+            <span>• Tiến trình đã dừng an toàn để tránh ghi nhận sai lệch.</span>
+            <button onclick="document.getElementById('btn-open-settings').click()" class="underline font-bold hover:text-red-900">Kiểm tra lại API Key hoặc đổi Model &rarr;</button>
+          </div>
+        </div>
+        <button onclick="document.getElementById('global-error-banner').classList.add('hidden')" class="text-red-400 hover:text-red-700">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- TAB 1: BỘ NÃO AI GIÁM THỊ (Smart Violation Logger)               -->
+    <!-- ================================================================ -->
+    <div id="tab-ai-logger" class="tab-content space-y-6">
+      
+      <!-- Top Overview Card -->
+      <div class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+        <div class="relative z-10 max-w-3xl">
+          <div class="inline-flex items-center gap-2 bg-blue-500/20 border border-blue-400/30 px-3 py-1 rounded-full text-xs font-semibold text-blue-200 mb-3 backdrop-blur-xs">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>Trợ lý Số Chuyên sâu về Quản lý Giáo dục & Thi đua</span>
+          </div>
+          <h2 class="text-xl md:text-2xl font-bold tracking-tight">Chuẩn Hóa & Bóc Tách Vi Phạm Tự Động</h2>
+          <p class="text-slate-300 text-sm mt-1 leading-relaxed">
+            Nhập ghi chú thô của Giám thị / Đội Cờ đỏ (bằng văn bản tự nhiên). AI sẽ tự động phân tích cú pháp, khớp chính xác tên học sinh theo lớp, quy đổi về 33 danh mục lỗi chính thức và áp mức điểm trừ chuẩn của trường THPT Lê Hồng Phong.
+          </p>
+        </div>
+        <div class="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
+          <i data-lucide="award" class="w-64 h-64 text-white"></i>
+        </div>
+      </div>
+
+      <!-- Main Input & Process Area -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Column: Input Form (7 cols) -->
+        <div class="lg:col-span-7 space-y-4">
+          <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+            
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                <i data-lucide="edit-3" class="w-4 h-4 text-blue-600"></i>
+                <span>Nội dung ghi nhận vi phạm</span>
+              </h3>
+              
+              <!-- Date Picker & Computed Week -->
+              <div class="flex items-center gap-2">
+                <label class="text-xs text-slate-500 font-medium">Ngày:</label>
+                <input type="date" id="input-violation-date" 
+                       class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <span id="display-computed-week" class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-1 rounded-md">
+                  Tuần 7
+                </span>
+              </div>
+            </div>
+
+            <!-- Natural Language Textarea -->
+            <div class="relative">
+              <textarea id="ai-input-text" rows="5"
+                placeholder="Ví dụ nhập liệu tự do:
+- Nguyễn Bo 11A04 đi học muộn 15p, không đeo bảng tên
+- 12C08: H Ti Ra Niê mặc sai đồng phục
+- Học sinh Lê Âu Kỳ lớp 10B11 bỏ tiết sinh hoạt 15p"
+                class="w-full text-sm p-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-slate-800 placeholder:text-slate-400 placeholder:font-sans bg-slate-50/50"></textarea>
+            </div>
+
+            <!-- Quick Template Chips -->
+            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+              <span class="text-slate-400 font-medium">Mẫu thử nhanh:</span>
+              <button onclick="window.app.fillSampleText(1)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Mẫu 1: 3 học sinh vi phạm</button>
+              <button onclick="window.app.fillSampleText(2)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Mẫu 2: Vi phạm giờ giấc & bảng tên</button>
+              <button onclick="window.app.fillSampleText(3)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Mẫu 3: Bỏ tiết sinh hoạt</button>
+            </div>
+
+            <!-- Actions Bar -->
+            <div class="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div class="flex items-center gap-2 text-xs text-slate-500">
+                <i data-lucide="cpu" class="w-4 h-4 text-slate-400"></i>
+                <span>Model AI:</span>
+                <span id="display-current-model-tag" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">gemini-3-flash-preview</span>
+              </div>
+
+              <div class="flex items-center gap-2 w-full sm:w-auto">
+                <button id="btn-clear-ai-input" class="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">
+                  Xóa trắng
+                </button>
+                <button id="btn-run-ai-parse" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-500/25">
+                  <i data-lucide="sparkles" class="w-4 h-4"></i>
+                  <span>Bắt Đầu Chuẩn Hóa Bằng AI</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Quick Manual Entry Alternative (when teacher doesn't want AI) -->
+          <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+            <h4 class="font-bold text-slate-800 text-xs flex items-center gap-2 mb-3">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i>
+              <span>Hoặc nhập thủ công trực tiếp có gợi ý học sinh</span>
+            </h4>
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+              <div class="sm:col-span-4 relative">
+                <input type="text" id="manual-student-input" placeholder="Gõ tên hoặc lớp (VD: An 10B01)..."
+                       class="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <!-- Autocomplete dropdown -->
+                <div id="autocomplete-list" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto text-xs"></div>
+              </div>
+              <div class="sm:col-span-5">
+                <select id="manual-rule-select" class="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <option value="">-- Chọn lỗi vi phạm --</option>
+                </select>
+              </div>
+              <div class="sm:col-span-3">
+                <button id="btn-manual-add" class="w-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-lg transition flex items-center justify-center gap-1">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Thêm</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Column: Live Stepper & Verification Preview (5 cols) -->
+        <div class="lg:col-span-5 space-y-4">
+          
+          <!-- Stepper Process State Card (as required by AI_INSTRUCTIONS) -->
+          <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+            <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider text-slate-400 mb-4 flex items-center justify-between">
+              <span>Tiến trình xử lý AI</span>
+              <span id="stepper-badge-status" class="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Sẵn sàng</span>
+            </h3>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-5">
+              <div id="stepper-progress-bar" class="h-full bg-blue-600 w-0 transition-all duration-300"></div>
+            </div>
+
+            <!-- Steps list -->
+            <div class="space-y-3">
+              
+              <!-- Step 1 -->
+              <div id="step-item-1" class="step-item flex items-start gap-3">
+                <div class="step-icon w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
+                  1
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-slate-800">Bóc tách thực thể & Nhận diện</h4>
+                  <p class="text-[11px] text-slate-500">Trích xuất tên học sinh, lớp và mô tả hành vi từ đoạn văn.</p>
+                </div>
+              </div>
+
+              <!-- Step 2 -->
+              <div id="step-item-2" class="step-item flex items-start gap-3">
+                <div class="step-icon w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
+                  2
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-slate-800">Đối chiếu Hồ sơ [Họ tên - Lớp]</h4>
+                  <p class="text-[11px] text-slate-500">Kiểm tra khớp với CSDL 1.226 học sinh THPT Lê Hồng Phong.</p>
+                </div>
+              </div>
+
+              <!-- Step 3 -->
+              <div id="step-item-3" class="step-item flex items-start gap-3">
+                <div class="step-icon w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
+                  3
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-slate-800">Chuẩn hóa Quy chế & Tính điểm phạt</h4>
+                  <p class="text-[11px] text-slate-500">Quy đổi về 33 danh mục lỗi chuẩn và áp khung điểm trừ.</p>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Fallback notification log -->
+            <div id="ai-fallback-log" class="hidden mt-4 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
+              <i data-lucide="refresh-cw" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-spin"></i>
+              <span id="ai-fallback-text">Đang chuyển đổi model dự phòng...</span>
+            </div>
+
+          </div>
+
+          <!-- Preview & Confirmation Box -->
+          <div id="ai-result-preview-card" class="hidden bg-white rounded-xl border border-blue-200 p-5 shadow-md">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>
+                <span>Kết quả phân tích (<span id="preview-count">0</span> vi phạm)</span>
+              </h3>
+              <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Sẵn sàng lưu</span>
+            </div>
+
+            <!-- Container for parsed item cards -->
+            <div id="preview-records-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+
+            <!-- Confirm Save Button -->
+            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+              <button id="btn-cancel-preview" class="text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded">Hủy bỏ</button>
+              <button id="btn-confirm-save-violations" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5">
+                <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                <span>Ghi Nhận Vào Nhật Ký</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- TAB 2: NHẬT KÝ VI PHẠM HÀNG NGÀY (Violation Logs)                -->
+    <!-- ================================================================ -->
+    <div id="tab-violation-logs" class="tab-content hidden space-y-4">
+      
+      <!-- Filter & Action Bar -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        
+        <!-- Filters -->
+        <div class="flex flex-wrap items-center gap-2.5 text-xs">
+          <!-- Week filter -->
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-500 font-medium">Tuần:</span>
+            <select id="log-filter-week" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-semibold text-slate-800 focus:outline-none">
+              <option value="all">Tất cả các tuần</option>
+            </select>
+          </div>
+
+          <!-- Class filter -->
+          <div class="flex items-center gap-1.5">
+            <span class="text-slate-500 font-medium">Lớp:</span>
+            <select id="log-filter-class" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-semibold text-slate-800 focus:outline-none">
+              <option value="all">Tất cả lớp (29 lớp)</option>
+            </select>
+          </div>
+
+          <!-- Search query -->
+          <div class="relative">
+            <input type="text" id="log-filter-search" placeholder="Tìm tên học sinh, nội dung lỗi..."
+                   class="bg-slate-50 border border-slate-300 rounded-lg pl-7 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none w-56">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2"></i>
+          </div>
+        </div>
+
+        <!-- Export & Tool buttons -->
+        <div class="flex items-center gap-2 text-xs">
+          <button id="btn-copy-markdown-logs" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>Copy Bảng Markdown</span>
+          </button>
+          
+          <button id="btn-export-excel-logs" class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition shadow-xs">
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+            <span>Xuất Excel (.xlsx)</span>
+          </button>
+
+          <button id="btn-clear-all-logs" class="flex items-center gap-1 px-2.5 py-1.5 text-red-600 hover:bg-red-50 font-medium rounded-lg transition" title="Xóa toàn bộ nhật ký vi phạm">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Violation Records Table -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto max-h-[600px]">
+          <table class="w-full text-left border-collapse custom-table">
+            <thead class="sticky top-0 z-10 bg-slate-100 border-b border-slate-200">
+              <tr>
+                <th class="w-12 text-center">STT</th>
+                <th class="w-20 text-center">Tuần</th>
+                <th class="w-28">Ngày vi phạm</th>
+                <th class="w-48">Họ và Tên</th>
+                <th class="w-20 text-center">Lớp</th>
+                <th>Nội dung vi phạm (Chuẩn hóa)</th>
+                <th class="w-24 text-center">Điểm trừ</th>
+                <th>Ghi chú gốc</th>
+                <th class="w-20 text-center">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="logs-table-body">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty state placeholder -->
+        <div id="logs-empty-state" class="py-12 text-center text-slate-400">
+          <i data-lucide="clipboard-x" class="w-12 h-12 mx-auto text-slate-300 mb-2"></i>
+          <p class="text-sm font-medium">Chưa có bản ghi vi phạm nào trong tuần được chọn.</p>
+          <p class="text-xs text-slate-400 mt-1">Sử dụng tab "Bộ Não AI Giám Thị" để bắt đầu ghi nhận dữ liệu.</p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- TAB 3: XẾP HẠNG & BÁO CÁO THI ĐUA (Emulation Rankings)           -->
+    <!-- ================================================================ -->
+    <div id="tab-emulation" class="tab-content hidden space-y-6">
+      
+      <!-- Top Bar: Select Week & Export -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-slate-700">Xem xếp hạng cho:</span>
+            <select id="emulation-select-week" class="text-xs font-bold bg-blue-50 border border-blue-200 text-blue-800 rounded-lg px-3 py-1.5 focus:outline-none">
+              <!-- Filled dynamically with weeks -->
+            </select>
+          </div>
+          <span class="text-xs text-slate-500">
+            • Nguyên tắc: Lớp có tổng điểm trừ <strong class="text-slate-800">thấp nhất</strong> xếp thứ <strong class="text-amber-600">Hạng 1</strong>.
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs">
+          <button id="btn-copy-markdown-emulation" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>Copy Bảng Báo Cáo</span>
+          </button>
+          
+          <button id="btn-export-excel-emulation" class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition shadow-xs">
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+            <span>Xuất Báo Cáo Tuần (.xlsx)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Visual Charts Row -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Chart 1: Bar chart penalty points by class -->
+        <div class="lg:col-span-8 bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+          <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center justify-between">
+            <span>Biểu đồ tổng điểm trừ theo lớp (Tuần được chọn)</span>
+            <span class="text-[11px] font-normal text-slate-400">Cột càng thấp thi đua càng tốt</span>
+          </h3>
+          <div class="h-64 relative">
+            <canvas id="chart-class-penalties"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart 2: Top violations doughnut -->
+        <div class="lg:col-span-4 bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
+          <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-4">
+            Top lỗi vi phạm phổ biến
+          </h3>
+          <div class="h-64 relative flex items-center justify-center">
+            <canvas id="chart-top-errors"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Official Emulation Ranking Table -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+            <i data-lucide="award" class="w-4 h-4 text-amber-500"></i>
+            <span id="emulation-table-title">Bảng Tổng Hợp & Xếp Hạng Thi Đua</span>
+          </h3>
+          <span class="text-xs font-semibold text-slate-500">29 Lớp (Khối 10, 11, 12)</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse custom-table">
+            <thead>
+              <tr>
+                <th class="w-20 text-center">Xếp Hạng</th>
+                <th class="w-32">Lớp</th>
+                <th class="w-32 text-center">Tổng Số Lỗi</th>
+                <th class="w-36 text-center">Tổng Điểm Trừ</th>
+                <th class="w-36 text-center">Trạng Thái Thi Đua</th>
+                <th>Nhận xét & Đánh giá Ban Thi Đua</th>
+              </tr>
+            </thead>
+            <tbody id="emulation-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- TAB 4: QUẢN LÝ HỌC SINH (Student Management - Open Source)       -->
+    <!-- ================================================================ -->
+    <div id="tab-students" class="tab-content hidden space-y-4">
+      
+      <!-- Overview & Action Bar -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="relative">
+            <input type="text" id="student-search-query" placeholder="Tìm theo tên học sinh..."
+                   class="bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:outline-none w-56">
+            <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2"></i>
+          </div>
+
+          <div class="flex items-center gap-1.5 text-xs">
+            <span class="text-slate-500 font-medium">Lọc lớp:</span>
+            <select id="student-filter-class" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 font-semibold text-slate-800 focus:outline-none">
+              <option value="all">Tất cả lớp (29 lớp)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <!-- Add Student Button -->
+          <button id="btn-open-add-student" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition shadow-xs">
+            <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+            <span>Thêm Học Sinh</span>
+          </button>
+
+          <!-- Import Excel Button -->
+          <button id="btn-open-import-students" class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg transition shadow-xs">
+            <i data-lucide="file-up" class="w-3.5 h-3.5"></i>
+            <span>Nhập File Excel</span>
+          </button>
+
+          <!-- Export Excel Button -->
+          <button id="btn-export-students-excel" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Xuất Excel</span>
+          </button>
+
+          <!-- Reset Default Button -->
+          <button id="btn-reset-default-students" class="text-slate-400 hover:text-red-600 p-1.5 rounded transition" title="Khôi phục danh sách gốc THPT Lê Hồng Phong">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Students Table -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500 font-medium">
+          <span>Hiển thị: <strong id="student-table-count" class="text-slate-800">1226</strong> học sinh</span>
+          <span class="italic text-slate-400">Bạn có toàn quyền thêm, sửa, xóa học sinh trực tiếp</span>
+        </div>
+        <div class="overflow-x-auto max-h-[550px]">
+          <table class="w-full text-left border-collapse custom-table">
+            <thead class="sticky top-0 z-10 bg-slate-100 border-b border-slate-200">
+              <tr>
+                <th class="w-16 text-center">STT</th>
+                <th class="w-28 text-center">Lớp</th>
+                <th>Họ và Tên Học Sinh</th>
+                <th class="w-28 text-center">Giới Tính</th>
+                <th class="w-24 text-center">Mã ID</th>
+                <th class="w-24 text-center">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="students-table-body">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- TAB 5: DANH MỤC QUY ĐỊNH LỖI (Rules Catalog - Open Source)      -->
+    <!-- ================================================================ -->
+    <div id="tab-rules" class="tab-content hidden space-y-4">
+      
+      <!-- Top Action Bar -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-bold text-slate-800">Quy Định & Khung Điểm Trừ Thi Đua</h3>
+          <p class="text-xs text-slate-500">Hệ thống áp dụng đúng các danh mục này để chuẩn hóa và tính điểm tự động.</p>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs">
+          <button id="btn-open-add-rule" class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition shadow-xs">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Thêm Lỗi Quy Định Mới</span>
+          </button>
+
+          <button id="btn-reset-default-rules" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition" title="Khôi phục danh mục 33 lỗi gốc của trường">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+            <span>Khôi Phục Mặc Định</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Rules Table -->
+      <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse custom-table">
+            <thead>
+              <tr>
+                <th class="w-16 text-center">STT</th>
+                <th>Tên Danh Mục Lỗi Vi Phạm (Chuẩn quy định)</th>
+                <th class="w-32 text-center">Điểm Trừ / Lần</th>
+                <th class="w-36 text-center">Mức Độ</th>
+                <th class="w-28 text-center">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody id="rules-table-body">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="bg-white border-t border-slate-200 py-4 px-4 lg:px-8 text-center text-xs text-slate-500 mt-auto">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold text-slate-700">Trường THPT Lê Hồng Phong</span>
+        <span>•</span>
+        <span>Ban Thi Đua & Giám Thị</span>
+      </div>
+      <div>
+        <span>Năm học 2026 - 2027 • Tuần 1 bắt đầu từ 07/09/2026</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ================================================================ -->
+  <!-- MODAL: CÀI ĐẶT API KEY & CHỌN MODEL AI (Theo AI_INSTRUCTIONS)    -->
+  <!-- ================================================================ -->
+  <div id="modal-settings" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900">Thiết Lập Model & API Key</h3>
+            <p class="text-xs text-slate-500">Cấu hình kết nối Google Gemini API cho ứng dụng</p>
+          </div>
+        </div>
+        <button id="btn-close-settings" class="text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="mt-5 space-y-5">
+        
+        <!-- API Key Input Section -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">Google Gemini API Key</label>
+            <a href="https://aistudio.google.com/api-keys" target="_blank" class="text-xs font-semibold text-red-600 hover:text-red-700 flex items-center gap-1">
+              <span>Lấy API key miễn phí tại đây</span>
+              <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+          <div class="relative">
+            <input type="password" id="input-api-key" placeholder="Dán API Key (bắt đầu bằng AIzaSy...)"
+                   class="w-full text-xs font-mono p-3 pr-10 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+            <button type="button" id="btn-toggle-key-visibility" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-500 mt-1.5">
+            🔒 Key được lưu an toàn trong <code class="font-mono bg-slate-100 px-1 py-0.5 rounded text-slate-700">localStorage</code> của trình duyệt, không bao giờ gửi qua máy chủ trung gian.
+          </p>
+        </div>
+
+        <!-- Model Selection Cards (Order specified in AI_INSTRUCTIONS) -->
+        <div>
+          <label class="text-xs font-bold text-slate-700 uppercase tracking-wider block mb-2">Chọn Model AI Ưu Tiên</label>
+          <div class="space-y-2.5" id="model-cards-container">
+            
+            <!-- Card 1: Flash (Default) -->
+            <div data-model="gemini-3-flash-preview" class="model-card p-3.5 rounded-xl bg-white flex items-start gap-3">
+              <div class="mt-0.5">
+                <input type="radio" name="radio-model" id="model-flash" value="gemini-3-flash-preview" class="accent-blue-600">
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-900">gemini-3-flash-preview</span>
+                  <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full">Mặc định</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5">Tốc độ cực nhanh, phản hồi tức thì, tối ưu phân tích ngôn ngữ vi phạm.</p>
+              </div>
+            </div>
+
+            <!-- Card 2: Pro -->
+            <div data-model="gemini-3-pro-preview" class="model-card p-3.5 rounded-xl bg-white flex items-start gap-3">
+              <div class="mt-0.5">
+                <input type="radio" name="radio-model" id="model-pro" value="gemini-3-pro-preview" class="accent-blue-600">
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-900">gemini-3-pro-preview</span>
+                  <span class="text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full">Chính xác cao</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5">Suy luận ngữ cảnh chuyên sâu, bóc tách tên phức tạp và trường hợp đặc biệt.</p>
+              </div>
+            </div>
+
+            <!-- Card 3: 2.5 Flash -->
+            <div data-model="gemini-2.5-flash" class="model-card p-3.5 rounded-xl bg-white flex items-start gap-3">
+              <div class="mt-0.5">
+                <input type="radio" name="radio-model" id="model-25" value="gemini-2.5-flash" class="accent-blue-600">
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-900">gemini-2.5-flash</span>
+                  <span class="text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-full">Dự phòng</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5">Dự phòng ổn định khi các model mới gặp sự cố hạn mức hạn ngạch.</p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Fallback Mechanism Note as required by AI_INSTRUCTIONS -->
+          <div class="mt-3 p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-800 space-y-1">
+            <div class="flex items-center gap-1.5 font-bold">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-blue-600"></i>
+              <span>Cơ chế Tự Động Fallback & Retry:</span>
+            </div>
+            <p class="text-[11px] text-blue-700 leading-relaxed">
+              Nếu model được chọn gặp lỗi hoặc quá tải (429 RESOURCE_EXHAUSTED), hệ thống sẽ <strong>tự động thử lại</strong> với model tiếp theo theo chuỗi mà không làm mất dữ liệu đã nhập.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+        <button id="btn-delete-api-key" class="text-xs text-red-600 hover:text-red-700 font-semibold px-2 py-1">
+          Xóa Key khỏi máy
+        </button>
+        <div class="flex items-center gap-2">
+          <button id="btn-cancel-settings" class="text-xs text-slate-600 hover:bg-slate-100 px-4 py-2 rounded-lg font-semibold transition">
+            Đóng
+          </button>
+          <button id="btn-save-settings" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-bold transition shadow-xs">
+            Lưu Thiết Lập
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- MODAL: THÊM / SỬA HỌC SINH (Student Edit/Add Modal)             -->
+  <!-- ================================================================ -->
+  <div id="modal-student" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+      <h3 id="modal-student-title" class="text-sm font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">Thêm Học Sinh Mới</h3>
+      
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Lớp:</label>
+          <input type="text" id="modal-student-class" placeholder="Ví dụ: 10B01, 11A04, 12C03..."
+                 class="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 uppercase font-bold text-slate-800">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Họ và Tên Học Sinh:</label>
+          <input type="text" id="modal-student-name" placeholder="Ví dụ: Nguyễn Văn An"
+                 class="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-800">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Giới Tính:</label>
+          <select id="modal-student-gender" class="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <option value="Nam">Nam</option>
+            <option value="Nữ">Nữ</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-6 pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+        <button onclick="document.getElementById('modal-student').classList.add('hidden')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-semibold">Hủy</button>
+        <button id="btn-save-student" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-xs">Lưu Học Sinh</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- MODAL: THÊM / SỬA QUY TẮC LỖI (Rule Edit/Add Modal)              -->
+  <!-- ================================================================ -->
+  <div id="modal-rule" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+      <h3 id="modal-rule-title" class="text-sm font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">Thêm Quy Định Lỗi Vi Phạm</h3>
+      
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Tên Quy Định Lỗi:</label>
+          <input type="text" id="modal-rule-name" placeholder="Ví dụ: Đi học muộn, Không bảng tên..."
+                 class="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-800">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Điểm Trừ (Ví dụ: 0.5, 1.0, 3.0):</label>
+          <input type="number" step="0.5" min="0" max="10" id="modal-rule-points" value="0.5"
+                 class="w-full p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800">
+        </div>
+      </div>
+
+      <div class="mt-6 pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+        <button onclick="document.getElementById('modal-rule').classList.add('hidden')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-semibold">Hủy</button>
+        <button id="btn-save-rule" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-xs">Lưu Quy Định</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- MODAL: NHẬP EXCEL HỌC SINH (Import Modal)                        -->
+  <!-- ================================================================ -->
+  <div id="modal-import-students" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <h3 class="text-sm font-bold text-slate-900">Nhập Danh Sách Học Sinh Từ File Excel</h3>
+        <button onclick="document.getElementById('modal-import-students').classList.add('hidden')" class="text-slate-400 hover:text-slate-700">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="mt-4 space-y-3 text-xs">
+        <p class="text-slate-600 leading-relaxed">
+          Bạn có thể nạp file Excel (<code class="bg-slate-100 px-1 py-0.5 rounded font-mono">.xlsx</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">.xlsm</code>, <code class="bg-slate-100 px-1 py-0.5 rounded font-mono">.csv</code>). Hệ thống sẽ tự động đọc các cột: <strong>Lớp</strong>, <strong>Họ và Tên</strong>, <strong>Giới tính</strong>.
+        </p>
+
+        <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition cursor-pointer bg-slate-50"
+             onclick="document.getElementById('file-import-input').click()">
+          <i data-lucide="file-spreadsheet" class="w-8 h-8 text-blue-600 mx-auto mb-2"></i>
+          <span class="block text-xs font-semibold text-slate-700">Nhấp để chọn file Excel hoặc kéo thả vào đây</span>
+          <span class="block text-[11px] text-slate-400 mt-1">Hỗ trợ file .xlsx, .xlsm, .csv</span>
+          <input type="file" id="file-import-input" accept=".xlsx, .xlsm, .csv" class="hidden">
+        </div>
+
+        <div id="import-preview-box" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 text-xs">
+          <div class="flex items-center justify-between font-bold">
+            <span>Đã đọc file thành công:</span>
+            <span id="import-preview-count">0 học sinh</span>
+          </div>
+          <div class="mt-2 flex items-center gap-3">
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="import-mode" value="replace" checked class="accent-blue-600">
+              <span>Thay thế toàn bộ danh sách cũ</span>
+            </label>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="radio" name="import-mode" value="append" class="accent-blue-600">
+              <span>Gộp thêm vào danh sách</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 pt-3 border-t border-slate-100 flex items-center justify-end gap-2 text-xs">
+        <button onclick="document.getElementById('modal-import-students').classList.add('hidden')" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-semibold">Đóng</button>
+        <button id="btn-confirm-import-students" disabled class="px-5 py-2 bg-blue-600 disabled:bg-slate-300 text-white rounded-lg font-bold shadow-xs">Tiến Hành Nạp Dữ Liệu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- Load Scripts in order -->
+  <!-- 1. Initial fallback database (1,226 students & 33 rules) -->
+  <script src="data_initial.js"></script>
+  <!-- 2. Gemini AI service -->
+  <script src="gemini-service.js"></script>
+  <!-- 3. Main Application Logic -->
+  <script src="app.js"></script>
+
+</body>
+</html>

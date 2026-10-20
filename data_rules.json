@@ -1,0 +1,167 @@
+[
+  {
+    "id": 1,
+    "name": "Bỏ tiết",
+    "points": 1.0
+  },
+  {
+    "id": 2,
+    "name": "Đi dép lê",
+    "points": 0.5
+  },
+  {
+    "id": 3,
+    "name": "Đi học muộn",
+    "points": 0.5
+  },
+  {
+    "id": 4,
+    "name": "Đi xe trong sân trường",
+    "points": 1.0
+  },
+  {
+    "id": 5,
+    "name": "Không bảng tên",
+    "points": 0.5
+  },
+  {
+    "id": 6,
+    "name": "Không đội mũ bảo hiểm",
+    "points": 1.0
+  },
+  {
+    "id": 7,
+    "name": "Không mặc áo dài",
+    "points": 0.5
+  },
+  {
+    "id": 8,
+    "name": "Không mặc áo đoàn",
+    "points": 0.5
+  },
+  {
+    "id": 9,
+    "name": "Không mang ghế, bt tên vào",
+    "points": 3.0
+  },
+  {
+    "id": 10,
+    "name": "Không nộp sổ trực",
+    "points": 1.0
+  },
+  {
+    "id": 11,
+    "name": "Không tổng hợp sổ đầu bài",
+    "points": 1.0
+  },
+  {
+    "id": 12,
+    "name": "Nhuộm tóc",
+    "points": 0.5
+  },
+  {
+    "id": 13,
+    "name": "Tổng hợp sổ đầu bài sai",
+    "points": 1.0
+  },
+  {
+    "id": 14,
+    "name": "Tổng hợp sổ trực sai",
+    "points": 1.0
+  },
+  {
+    "id": 15,
+    "name": "Vệ sinh trễ",
+    "points": 1.0
+  },
+  {
+    "id": 16,
+    "name": "Vi phạm khác",
+    "points": 1.0
+  },
+  {
+    "id": 17,
+    "name": "Bỏ tiết sinh hoạt 15p",
+    "points": 1.0
+  },
+  {
+    "id": 18,
+    "name": "Hút thuốc lá",
+    "points": 1.0
+  },
+  {
+    "id": 19,
+    "name": "Son môi",
+    "points": 0.5
+  },
+  {
+    "id": 20,
+    "name": "Làm móng",
+    "points": 0.5
+  },
+  {
+    "id": 21,
+    "name": "Sử dụng thuốc lá điện tử",
+    "points": 1.0
+  },
+  {
+    "id": 22,
+    "name": "Không bảng tên, đi xe trong sân trường",
+    "points": 1.0
+  },
+  {
+    "id": 23,
+    "name": "Không huy hiệu đoàn, đi xe trong sân trường",
+    "points": 1.0
+  },
+  {
+    "id": 24,
+    "name": "Mang đồ ăn vào trường",
+    "points": 0.5
+  },
+  {
+    "id": 25,
+    "name": "Làm tóc",
+    "points": 1.0
+  },
+  {
+    "id": 26,
+    "name": "Đi học muộn, Không bảng tên",
+    "points": 1.0
+  },
+  {
+    "id": 27,
+    "name": "Không bảng tên, Huy Hiệu đoàn",
+    "points": 1.0
+  },
+  {
+    "id": 28,
+    "name": "Đi học muộn, sai đồng phục",
+    "points": 1.0
+  },
+  {
+    "id": 29,
+    "name": "Sai đồng phục, không bảng tên, huy hiệu đoàn",
+    "points": 1.5
+  },
+  {
+    "id": 30,
+    "name": "Sai đồng phục",
+    "points": 0.5
+  },
+  {
+    "id": 31,
+    "name": "Đi cổng GV",
+    "points": 0.5
+  },
+  {
+    "id": 32,
+    "name": "Không đúng tác phong học sinh",
+    "points": 0.5
+  },
+  {
+    "id": 33,
+    "name": "Mang đồ ăn vào trường, không bảng tên",
+    "points": 1.0
+  }
+]
