@@ -84,9 +84,11 @@
 
         <!-- Lock / Unlock Status Button for Data Entry -->
         <button id="btn-toggle-auth-lock" 
-                class="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px]">
-          <i id="lock-icon" data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
-          <span id="lock-status-text">🔒 Đăng nhập</span>
+                type="button"
+                onclick="window.app && window.app.handleAuthButtonClick()"
+                class="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer">
+          <i id="lock-icon" data-lucide="lock" class="w-4 h-4 text-amber-400 pointer-events-none"></i>
+          <span id="lock-status-text" class="pointer-events-none">🔒 Đăng nhập</span>
         </button>
 
       </div>
@@ -935,6 +937,39 @@
     </div>
   </div>
 
+    <!-- ================================================================ -->
+  <!-- MODAL: XÁC THỰC MẬT KHẨU NHẬP LIỆU (lhp38)                      -->
+  <!-- ================================================================ -->
+  <div id="modal-login-password" 
+       class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
+       onclick="if(event.target===this) window.app && window.app.closePasswordModal()">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center animate-scale-up" onclick="event.stopPropagation()">
+      <div class="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 mx-auto flex items-center justify-center mb-3 pointer-events-none">
+        <i data-lucide="lock" class="w-6 h-6"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900">Đăng Nhập Ban Nề Nếp</h3>
+      <p class="text-xs text-slate-500 mt-1 mb-4">Vui lòng nhập mật khẩu để mở khóa quyền thêm, sửa, xóa dữ liệu</p>
+
+      <form id="form-login-password" onsubmit="event.preventDefault(); window.app && window.app.submitPassword(); return false;">
+        <input type="password" id="login-password" autocomplete="new-password" placeholder="Nhập mật khẩu..."
+               class="w-full text-center text-sm font-mono tracking-widest p-3 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 mb-2">
+        <p id="password-error-msg" class="text-xs text-red-600 font-bold hidden mb-3">Đăng nhập không thành công!</p>
+
+        <div class="flex items-center gap-2 mt-3">
+          <button type="button" id="btn-cancel-password-modal"
+                  onclick="window.app && window.app.closePasswordModal()"
+                  class="flex-1 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer">
+            Đóng
+          </button>
+          <button type="submit" id="btn-submit-password"
+                  class="flex-1 py-2.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow-xs cursor-pointer">
+            Đăng Nhập
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Container -->
   <div id="toast-container"></div>
 
@@ -947,34 +982,5 @@
   <script src="app.js"></script>
 
   <!-- ================================================================ -->
-  <!-- MODAL: XÁC THỰC MẬT KHẨU NHẬP LIỆU (lhp38)                      -->
-  <!-- ================================================================ -->
-  <div id="modal-login-password" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center animate-scale-up">
-      <div class="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 mx-auto flex items-center justify-center mb-3">
-        <i data-lucide="lock" class="w-6 h-6"></i>
-      </div>
-      <h3 class="text-base font-bold text-slate-900">Đăng Nhập Ban Nề Nếp</h3>
-      <p class="text-xs text-slate-500 mt-1 mb-4">Vui lòng nhập mật khẩu để mở khóa quyền thêm, sửa, xóa dữ liệu</p>
-
-      <form id="form-login-password">
-        <input type="password" id="login-password" autocomplete="new-password" placeholder="Nhập mật khẩu..."
-               class="w-full text-center text-sm font-mono tracking-widest p-3 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 mb-2">
-        <p id="password-error-msg" class="text-xs text-red-600 font-bold hidden mb-3">Đăng nhập không thành công!</p>
-
-        <div class="flex items-center gap-2 mt-3">
-          <button type="button" id="btn-cancel-password-modal"
-                  class="flex-1 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
-            Đóng
-          </button>
-          <button type="submit" id="btn-submit-password"
-                  class="flex-1 py-2.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow-xs">
-            Đăng Nhập
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-</body>
+  </body>
 </html>
