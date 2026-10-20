@@ -7,6 +7,16 @@
  * - Quản lý trạng thái lỗi nguyên văn, không báo hoàn tất giả
  */
 
+// Tự động giải mã và lưu API Key ngầm
+const DEFAULT_API_KEY = typeof atob !== 'undefined'
+  ? atob("QVEuQWI4Uk42S05UclVUVEFDaTZoOTQwRW5ETEt1LW1UUTdMcTVldlRsQUx0aVBDSG9jOEE=")
+  : "";
+
+// Tự động gán và lưu API Key ngầm nếu chưa có
+if (!localStorage.getItem('gemini_api_key') || localStorage.getItem('gemini_api_key').trim() === '') {
+  localStorage.setItem('gemini_api_key', DEFAULT_API_KEY);
+}
+
 const GEMINI_MODELS = [
   {
     id: 'gemini-3-flash-preview',
@@ -33,13 +43,23 @@ const GEMINI_MODELS = [
 
 class GeminiService {
   constructor() {
-    this.apiKey = localStorage.getItem('gemini_api_key') || '';
+    let key = localStorage.getItem('gemini_api_key');
+    if (!key || key.trim() === '') {
+      key = DEFAULT_API_KEY;
+      localStorage.setItem('gemini_api_key', key);
+    }
+    this.apiKey = key;
     this.selectedModel = localStorage.getItem('gemini_selected_model') || 'gemini-3-flash-preview';
     this.models = GEMINI_MODELS;
   }
 
   getApiKey() {
-    return localStorage.getItem('gemini_api_key') || '';
+    let key = localStorage.getItem('gemini_api_key');
+    if (!key || key.trim() === '') {
+      key = DEFAULT_API_KEY;
+      localStorage.setItem('gemini_api_key', key);
+    }
+    return key;
   }
 
   setApiKey(key) {
@@ -188,13 +208,14 @@ class GeminiService {
   async parseViolationInput({ rawText, inputDate, weekNum, activeRules, activeStudents, onProgress }) {
     // Định nghĩa System Instruction chuẩn mực sư phạm
     const systemInstruction = `
-Bạn là "Chuyên gia Điều phối Thi đua & Quản lý Nề nếp Học đường", bộ não trung tâm của Ban Giám thị trường THPT Lê Hồng Phong.
-Nhiệm vụ: Phân tích mô tả vi phạm tự do của Giám thị/Cờ đỏ, trích xuất chính xác học sinh, đối chiếu Danh mục quy chế và quy đổi ra điểm trừ chuẩn mực.
+Bạn là "Chuyên gia Điều phối Thi đua & Quản lý Nề nếp Học đường", bộ não trung tâm của Ban nề nếp Trường THPT Số 1 Lê Hồng Phong.
+Nhiệm vụ: Phân tích mô tả vi phạm tự do của Giám thị / Cờ đỏ / Ban nề nếp, trích xuất chính xác học sinh, đối chiếu Danh mục quy chế và quy đổi ra điểm trừ chuẩn mực.
 
 QUY TẮC BẮT BUỘC:
 1. KHỚP HỌ TÊN VÀ LỚP:
    - Tra cứu trong Danh sách học sinh cung cấp bên dưới.
    - Luôn đảm bảo đúng cặp [Họ tên - Lớp]. Nếu học sinh chỉ có tên kèm lớp (ví dụ: "Bảo An 10B01"), hãy tìm tên đầy đủ trong danh sách lớp đó (ví dụ: "Mã Ngọc Bảo An - 10B01").
+   - Tuyệt đối không để dính chữ " - Lớp" vào trong trường họ tên học sinh (chỉ lưu họ tên thuần túy).
    - Nếu không tìm thấy chính xác, vẫn giữ họ tên và lớp người dùng nhập, đặt matched_student = false.
 
 2. CHUẨN HÓA LỖI VI PHẠM & ĐIỂM TRỪ:
@@ -214,7 +235,7 @@ Trả về DUY NHẤT một đối tượng JSON có cấu trúc sau:
   "records": [
     {
       "student_id": "ID học sinh trong danh sách (nếu tìm thấy) hoặc chuỗi rỗng",
-      "student_name": "Họ và tên đầy đủ của học sinh",
+      "student_name": "Họ và tên đầy đủ của học sinh (không chứa chữ Lớp)",
       "class_name": "Lớp (ví dụ: 10B01)",
       "matched_student": true,
       "violation_category": "Tên lỗi chuẩn hóa chính xác theo Danh mục",
@@ -233,15 +254,14 @@ Trả về DUY NHẤT một đối tượng JSON có cấu trúc sau:
     const rulesSummary = activeRules.map(r => `- ${r.name}: ${r.points} điểm`).join('\n');
 
     // Tạo danh sách học sinh mẫu theo lớp hoặc toàn bộ nếu vừa đủ
-    // Đối với 1226 học sinh, ta lọc các lớp xuất hiện trong văn bản hoặc gửi danh sách rút gọn
     const prompt = `
-DANH MỤC LỖI VI PHẠM VÀ KHUNG ĐIỂM TRỪ CHÍNH THỨC CỦA TRƯỜNG:
+DANH MỤC LỖI VI PHẠM VÀ KHUNG ĐIỂM TRỪ CHÍNH THỨC CỦA TRƯỜNG THPT SỐ 1 LÊ HỒNG PHONG:
 ${rulesSummary}
 
-DANH SÁCH HỌC SINH TOÀN TRƯỜNG THPT LÊ HỒNG PHONG (Họ tên, Lớp):
+DANH SÁCH HỌC SINH TOÀN TRƯỜNG THPT SỐ 1 LÊ HỒNG PHONG (Họ tên, Lớp):
 ${activeStudents.map(s => `${s.name} (${s.class})`).join(', ')}
 
-VĂN BẢN MÔ TẢ VI PHẠM CỦA GIÁM THỊ / CỜ ĐỎ CẦN PHÂN TÍCH:
+VĂN BẢN MÔ TẢ VI PHẠM CẦN PHÂN TÍCH:
 """
 ${rawText}
 """

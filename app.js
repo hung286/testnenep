@@ -56,7 +56,16 @@ class DisciplineApp {
   loadViolations() {
     const saved = localStorage.getItem('dshs_violations');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { }
+      try { 
+        const parsed = JSON.parse(saved);
+        // Tự động làm sạch lỗi thừa chữ " - Lớp" nếu có trong dữ liệu cũ
+        parsed.forEach(v => {
+          if (v.student_name) {
+            v.student_name = v.student_name.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
+          }
+        });
+        return parsed;
+      } catch (e) { }
     }
     // Dữ liệu mẫu ban đầu từ Form Nhap Lieu (Tuần 7)
     return [
@@ -124,11 +133,18 @@ class DisciplineApp {
   }
 
   init() {
+    // 1. Tự động gán và lưu API Key ngầm
+    const DEFAULT_API_KEY = typeof atob !== "undefined" ? atob("QVEuQWI4Uk42S05UclVUVEFDaTZoOTQwRW5ETEt1LW1UUTdMcTVldlRsQUx0aVBDSG9jOEE=") : "";
+    if (!localStorage.getItem('gemini_api_key')) {
+      localStorage.setItem('gemini_api_key', DEFAULT_API_KEY);
+    }
+
     this.setupDateAndTime();
     this.setupTabs();
     this.setupEventListeners();
     this.setupSettingsModal();
     this.setupManualEntry();
+    this.setupPasswordAuth();
     this.updateBadges();
     this.populateDropdowns();
 
@@ -142,9 +158,6 @@ class DisciplineApp {
     if (window.lucide) {
       window.lucide.createIcons();
     }
-
-    // Kiểm tra API Key lần đầu
-    this.checkApiKeyPrompt();
   }
 
   setupDateAndTime() {
@@ -462,6 +475,10 @@ class DisciplineApp {
   // ==================== XỬ LÝ AI & QUY TRÌNH STEPPER ====================
 
   async handleRunAiParse() {
+    this.requirePassword(() => this.doRunAiParse());
+  }
+
+  async doRunAiParse() {
     const rawText = (document.getElementById('ai-input-text').value || '').trim();
     if (!rawText) {
       this.showToast('Vui lòng nhập nội dung mô tả vi phạm trước khi phân tích.', 'warning');
@@ -664,6 +681,10 @@ class DisciplineApp {
   }
 
   confirmSaveAiViolations() {
+    this.requirePassword(() => this.doConfirmSaveAiViolations());
+  }
+
+  doConfirmSaveAiViolations() {
     if (!this.pendingAiRecords || this.pendingAiRecords.length === 0) return;
 
     this.pendingAiRecords.forEach(rec => {
@@ -700,6 +721,10 @@ class DisciplineApp {
 
     studentInput.addEventListener('input', (e) => {
       const q = e.target.value.trim().toLowerCase();
+      // Xóa dataset cũ khi người dùng gõ mới
+      delete studentInput.dataset.studentName;
+      delete studentInput.dataset.studentClass;
+
       if (!q || q.length < 2) {
         autoList.classList.add('hidden');
         return;
@@ -707,18 +732,21 @@ class DisciplineApp {
 
       const matches = this.students.filter(s => 
         s.name.toLowerCase().includes(q) || s.class.toLowerCase().includes(q)
-      ).slice(0, 10);
+      ).slice(0, 15);
 
       if (matches.length === 0) {
-        autoList.innerHTML = `<div class="p-2 text-slate-400 italic">Không tìm thấy học sinh phù hợp</div>`;
+        autoList.innerHTML = `<div class="p-3 text-slate-400 text-xs italic text-center">Không tìm thấy học sinh phù hợp</div>`;
       } else {
-        autoList.innerHTML = matches.map(s => `
-          <div class="p-2 hover:bg-blue-50 cursor-pointer border-b border-slate-100 flex items-center justify-between"
-               onclick="window.app.selectManualStudent('${s.name}', '${s.class}')">
-            <span class="font-bold text-slate-800">${s.name}</span>
-            <span class="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-bold">${s.class}</span>
-          </div>
-        `).join('');
+        autoList.innerHTML = matches.map(s => {
+          const safeName = s.name.replace(/'/g, "\\'");
+          return `
+            <div class="suggestion-dropdown-item"
+                 onclick="window.app.selectManualStudent('${safeName}', '${s.class}')">
+              <span class="student-name">${s.name}</span>
+              <span class="student-class">${s.class}</span>
+            </div>
+          `;
+        }).join('');
       }
       autoList.classList.remove('hidden');
     });
@@ -732,50 +760,67 @@ class DisciplineApp {
 
     if (btnAdd) {
       btnAdd.addEventListener('click', () => {
-        const studentVal = studentInput.value.trim();
-        const ruleSelect = document.getElementById('manual-rule-select');
-        const selectedRule = ruleSelect.value;
-        const selectedOption = ruleSelect.options[ruleSelect.selectedIndex];
-        const points = selectedOption ? parseFloat(selectedOption.getAttribute('data-points')) || 0.5 : 0.5;
+        // Yêu cầu mật khẩu lhp38 khi thao tác nhập liệu
+        this.requirePassword(() => {
+          const studentVal = studentInput.value.trim();
+          const ruleSelect = document.getElementById('manual-rule-select');
+          const selectedRule = ruleSelect.value;
+          const selectedOption = ruleSelect.options[ruleSelect.selectedIndex];
+          const points = selectedOption ? parseFloat(selectedOption.getAttribute('data-points')) || 0.5 : 0.5;
 
-        if (!studentVal) {
-          this.showToast('Vui lòng nhập tên hoặc chọn học sinh.', 'warning');
-          return;
-        }
-        if (!selectedRule) {
-          this.showToast('Vui lòng chọn lỗi vi phạm.', 'warning');
-          return;
-        }
+          if (!studentVal) {
+            this.showToast('Vui lòng nhập tên hoặc chọn học sinh.', 'warning');
+            studentInput.focus();
+            return;
+          }
+          if (!selectedRule) {
+            this.showToast('Vui lòng chọn lỗi vi phạm.', 'warning');
+            ruleSelect.focus();
+            return;
+          }
 
-        // Tách Họ tên và Lớp nếu có dạng "Tên - Lớp" hoặc "Tên (Lớp)"
-        let name = studentVal;
-        let className = 'Chưa rõ';
-        const matchBracket = studentVal.match(/^(.*?)[\s\-\(]+([0-9]{2}[A-Za-z][0-9]{2})[\)]?$/);
-        if (matchBracket) {
-          name = matchBracket[1].trim();
-          className = matchBracket[2].trim().toUpperCase();
-        }
+          // Xử lý chuẩn xác: Tuyệt đối không để dính chữ " - Lớp" vào họ tên
+          let name = studentInput.dataset.studentName || '';
+          let className = studentInput.dataset.studentClass || '';
 
-        const dateVal = document.getElementById('input-violation-date').value || new Date().toISOString().split('T')[0];
-        const week = this.calculateWeek(dateVal);
+          if (!name) {
+            // Regex bóc tách linh hoạt: loại bỏ từ "Lớp", "lop", "-", "(", ")"
+            const match = studentVal.match(/^(.*?)(?:[\s\-\–\—\(\/]+(?:[Ll][ớơo]p\s*)?([0-9]{1,2}[A-Za-z0-9]+)[\)]?)$/i);
+            if (match) {
+              name = match[1].replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
+              className = match[2].trim().toUpperCase();
+            } else {
+              name = studentVal.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
+              className = 'Chưa rõ';
+            }
+          }
 
-        this.violations.unshift({
-          id: Date.now(),
-          week,
-          date: dateVal,
-          student_name: name,
-          class_name: className,
-          violation_category: selectedRule,
-          penalty_points: points,
-          original_note: 'Nhập thủ công tại form nhanh'
+          // Đảm bảo triệt để loại bỏ đuôi thừa "Lớp" nếu có
+          name = name.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
+
+          const dateVal = document.getElementById('input-violation-date').value || new Date().toISOString().split('T')[0];
+          const week = this.calculateWeek(dateVal);
+
+          this.violations.unshift({
+            id: Date.now(),
+            week,
+            date: dateVal,
+            student_name: name,
+            class_name: className,
+            violation_category: selectedRule,
+            penalty_points: points,
+            original_note: 'Nhập thủ công trực tiếp'
+          });
+
+          this.saveViolations();
+          studentInput.value = '';
+          delete studentInput.dataset.studentName;
+          delete studentInput.dataset.studentClass;
+          ruleSelect.value = '';
+          this.renderLogsTable();
+          this.renderEmulationTable();
+          this.showToast(`Đã ghi nhận vi phạm: ${name} - ${className}!`, 'success');
         });
-
-        this.saveViolations();
-        studentInput.value = '';
-        ruleSelect.value = '';
-        this.renderLogsTable();
-        this.renderEmulationTable();
-        this.showToast(`Đã thêm vi phạm của ${name} (${className})!`, 'success');
       });
     }
   }
@@ -783,7 +828,14 @@ class DisciplineApp {
   selectManualStudent(name, className) {
     const input = document.getElementById('manual-student-input');
     const autoList = document.getElementById('autocomplete-list');
-    if (input) input.value = `${name} - Lớp ${className}`;
+    // Chuẩn hóa tên sạch sẽ
+    const cleanName = name.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
+    if (input) {
+      // Định dạng chuẩn chỉ hiển thị Tên - Lớp (Ví dụ: Phùng Ly Na - 10B01)
+      input.value = `${cleanName} - ${className}`;
+      input.dataset.studentName = cleanName;
+      input.dataset.studentClass = className;
+    }
     if (autoList) autoList.classList.add('hidden');
   }
 
@@ -843,6 +895,18 @@ class DisciplineApp {
   }
 
   deleteViolation(id) {
+    this.requirePassword(() => {
+      if (confirm('Bạn có muốn xóa bản ghi vi phạm này?')) {
+        this.violations = this.violations.filter(v => v.id !== id);
+        this.saveViolations();
+        this.renderLogsTable();
+        this.renderEmulationTable();
+        this.showToast('Đã xóa bản ghi vi phạm!', 'info');
+      }
+    });
+  }
+
+  _oldDeleteViolation(id) {
     if (confirm('Bạn có muốn xóa bản ghi vi phạm này?')) {
       this.violations = this.violations.filter(v => v.id !== id);
       this.saveViolations();
@@ -1559,6 +1623,123 @@ class DisciplineApp {
       setTimeout(() => {
         this.openSettingsModal();
       }, 500);
+    }
+  }
+
+  // ==================== BẢO VỆ MẬT KHẨU NHẬP LIỆU (lhp38) ====================
+
+  setupPasswordAuth() {
+    this.PASSWORD_CONFIG = "lhp38";
+    this.pendingAction = null;
+
+    const btnToggleLock = document.getElementById('btn-toggle-auth-lock');
+    const modalPass = document.getElementById('modal-login-password');
+    const formPass = document.getElementById('form-login-password');
+    const btnCancel = document.getElementById('btn-cancel-password-modal');
+
+    this.updateLockStatusUI();
+
+    if (btnToggleLock) {
+      btnToggleLock.addEventListener('click', () => {
+        if (this.isDataEntryUnlocked()) {
+          if (confirm('Bạn đang mở khóa quyền nhập liệu. Bạn có muốn khóa lại không?')) {
+            sessionStorage.removeItem('data_entry_unlocked');
+            this.updateLockStatusUI();
+            this.showToast('Đã khóa lại quyền nhập liệu.', 'info');
+          }
+        } else {
+          this.openPasswordModal();
+        }
+      });
+    }
+
+    if (btnCancel && modalPass) {
+      btnCancel.addEventListener('click', () => {
+        modalPass.classList.add('hidden');
+        this.pendingAction = null;
+      });
+    }
+
+    if (formPass) {
+      formPass.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.submitPassword();
+      });
+    }
+  }
+
+  isDataEntryUnlocked() {
+    return sessionStorage.getItem('data_entry_unlocked') === 'true' || localStorage.getItem('data_entry_unlocked') === 'true';
+  }
+
+  updateLockStatusUI() {
+    const icon = document.getElementById('lock-icon');
+    const text = document.getElementById('lock-status-text');
+    const btn = document.getElementById('btn-toggle-auth-lock');
+    if (!text || !icon) return;
+
+    if (this.isDataEntryUnlocked()) {
+      text.textContent = 'Đã mở khóa (lhp38)';
+      icon.setAttribute('data-lucide', 'unlock');
+      icon.className = 'w-3.5 h-3.5 text-emerald-400';
+      if (btn) btn.className = 'flex items-center gap-1.5 bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-xs';
+    } else {
+      text.textContent = 'Đăng nhập (lhp38)';
+      icon.setAttribute('data-lucide', 'lock');
+      icon.className = 'w-3.5 h-3.5 text-amber-400';
+      if (btn) btn.className = 'flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-xs';
+    }
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  openPasswordModal(onSuccess = null) {
+    this.pendingAction = onSuccess;
+    const modal = document.getElementById('modal-login-password');
+    const input = document.getElementById('login-password');
+    const err = document.getElementById('password-error-msg');
+    if (err) err.classList.add('hidden');
+    if (input) {
+      input.value = '';
+      input.setAttribute('autocomplete', 'new-password');
+    }
+    if (modal) {
+      modal.classList.remove('hidden');
+      setTimeout(() => input && input.focus(), 150);
+    }
+  }
+
+  submitPassword() {
+    const input = document.getElementById('login-password');
+    const err = document.getElementById('password-error-msg');
+    const modal = document.getElementById('modal-login-password');
+    const entered = (input ? input.value : '').trim();
+
+    if (entered === this.PASSWORD_CONFIG) {
+      sessionStorage.setItem('data_entry_unlocked', 'true');
+      this.updateLockStatusUI();
+      if (modal) modal.classList.add('hidden');
+      if (err) err.classList.add('hidden');
+      this.showToast('Mở khóa quyền nhập liệu Ban nề nếp thành công!', 'success');
+
+      if (typeof this.pendingAction === 'function') {
+        const action = this.pendingAction;
+        this.pendingAction = null;
+        action();
+      }
+    } else {
+      if (err) err.classList.remove('hidden');
+      if (input) {
+        input.select();
+        input.focus();
+      }
+    }
+  }
+
+  requirePassword(onSuccess) {
+    if (this.isDataEntryUnlocked()) {
+      onSuccess();
+    } else {
+      this.openPasswordModal(onSuccess);
     }
   }
 

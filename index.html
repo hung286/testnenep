@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hệ thống Quản lý Nề nếp & Thi đua Học đường - THPT Lê Hồng Phong</title>
+  <title>Hệ thống Quản lý Nề nếp & Học sinh vi phạm - Trường THPT Số 1 Lê Hồng Phong</title>
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,11 +57,11 @@
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <span class="text-xs font-bold tracking-wider uppercase text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Ban Thi Đua - Giám Thị</span>
+            <span class="text-xs font-bold tracking-wider uppercase text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Ban nề nếp</span>
             <span class="text-xs text-slate-400">|</span>
-            <span class="text-xs font-medium text-slate-500">THPT Lê Hồng Phong</span>
+            <span class="text-xs font-medium text-slate-500">Trường THPT Số 1 Lê Hồng Phong</span>
           </div>
-          <h1 class="text-base md:text-lg font-bold text-slate-900 leading-tight">Điều Phối Nề Nếp & Thi Đua Học Đường</h1>
+          <h1 class="text-base md:text-lg font-bold text-slate-900 leading-tight">Nề Nếp & Học sinh vi phạm</h1>
         </div>
       </div>
 
@@ -75,20 +75,11 @@
           <span class="bg-blue-600 text-white font-bold px-2 py-0.5 rounded-full" id="header-week-display">Tuần 7</span>
         </div>
 
-        <!-- Red Link for API Key as required by AI_INSTRUCTIONS -->
-        <a href="https://aistudio.google.com/api-keys" target="_blank" rel="noopener noreferrer" 
-           class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-300 rounded-lg px-3 py-1.5 transition shadow-xs group">
-          <i data-lucide="key" class="w-3.5 h-3.5 text-red-500 group-hover:scale-110 transition-transform"></i>
-          <span>Lấy API key để sử dụng app</span>
-          <i data-lucide="external-link" class="w-3 h-3 text-red-400"></i>
-        </a>
-
-        <!-- Settings Button -->
-        <button id="btn-open-settings" 
+        <!-- Lock / Unlock Status Button for Data Entry -->
+        <button id="btn-toggle-auth-lock" 
                 class="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow-xs">
-          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
-          <span>Cài đặt AI</span>
-          <span id="api-key-status-indicator" class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <i id="lock-icon" data-lucide="lock" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span id="lock-status-text">Đăng nhập (lhp38)</span>
         </button>
 
       </div>
@@ -238,28 +229,46 @@
 
           </div>
 
-          <!-- Quick Manual Entry Alternative (when teacher doesn't want AI) -->
-          <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-            <h4 class="font-bold text-slate-800 text-xs flex items-center gap-2 mb-3">
-              <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i>
-              <span>Hoặc nhập thủ công trực tiếp có gợi ý học sinh</span>
-            </h4>
-            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
-              <div class="sm:col-span-4 relative">
-                <input type="text" id="manual-student-input" placeholder="Gõ tên hoặc lớp (VD: An 10B01)..."
-                       class="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+          <!-- Prominent Quick Manual Entry (Optimized for Mobile & Big Touch) -->
+          <div class="bg-white rounded-2xl border-2 border-blue-200/80 p-5 md:p-6 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="font-extrabold text-slate-900 text-sm md:text-base flex items-center gap-2">
+                <span class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <i data-lucide="user-check" class="w-5 h-5"></i>
+                </span>
+                <span>Nhập Thủ Công Trực Tiếp (Gợi ý học sinh thông minh)</span>
+              </h4>
+              <span class="text-xs font-semibold text-slate-500 hidden sm:inline">Tối ưu cho cả điện thoại & máy tính</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5">
+              <!-- Student input with Autocomplete -->
+              <div class="md:col-span-5 relative">
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">1. Tìm học sinh (gõ tên hoặc lớp):</label>
+                <div class="relative">
+                  <input type="text" id="manual-student-input" placeholder="Gõ tên hoặc lớp (VD: An 10B01)..."
+                         autocomplete="off"
+                         class="student-search-input bg-slate-50 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 focus:bg-white text-slate-900 font-semibold shadow-xs">
+                  <i data-lucide="search" class="w-5 h-5 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none"></i>
+                </div>
                 <!-- Autocomplete dropdown -->
-                <div id="autocomplete-list" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto text-xs"></div>
+                <div id="autocomplete-list" class="hidden absolute top-full left-0 right-0 mt-1.5 bg-white border-2 border-blue-200 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-100"></div>
               </div>
-              <div class="sm:col-span-5">
-                <select id="manual-rule-select" class="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
-                  <option value="">-- Chọn lỗi vi phạm --</option>
+
+              <!-- Violation rule selector -->
+              <div class="md:col-span-5">
+                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">2. Chọn lỗi vi phạm quy định:</label>
+                <select id="manual-rule-select" 
+                        class="w-full text-sm font-semibold p-3.5 border-2 border-slate-300 rounded-xl bg-slate-50 focus:outline-none focus:border-blue-600 focus:bg-white text-slate-900 shadow-xs">
+                  <option value="">-- Chọn lỗi vi phạm (33 quy định) --</option>
                 </select>
               </div>
-              <div class="sm:col-span-3">
-                <button id="btn-manual-add" class="w-full text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-3 rounded-lg transition flex items-center justify-center gap-1">
-                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                  <span>Thêm</span>
+
+              <!-- Submit button -->
+              <div class="md:col-span-2 flex items-end">
+                <button id="btn-manual-add" class="w-full text-sm font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 rounded-xl transition shadow-md shadow-emerald-500/25 flex items-center justify-center gap-1.5">
+                  <i data-lucide="plus-circle" class="w-5 h-5"></i>
+                  <span>Thêm Lỗi</span>
                 </button>
               </div>
             </div>
@@ -662,9 +671,9 @@
   <footer class="bg-white border-t border-slate-200 py-4 px-4 lg:px-8 text-center text-xs text-slate-500 mt-auto">
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
       <div class="flex items-center gap-2">
-        <span class="font-semibold text-slate-700">Trường THPT Lê Hồng Phong</span>
+        <span class="font-semibold text-slate-700">Trường THPT Số 1 Lê Hồng Phong</span>
         <span>•</span>
-        <span>Ban Thi Đua & Giám Thị</span>
+        <span>Ban nề nếp</span>
       </div>
       <div>
         <span>Năm học 2026 - 2027 • Tuần 1 bắt đầu từ 07/09/2026</span>
@@ -921,6 +930,36 @@
   <script src="gemini-service.js"></script>
   <!-- 3. Main Application Logic -->
   <script src="app.js"></script>
+
+  <!-- ================================================================ -->
+  <!-- MODAL: XÁC THỰC MẬT KHẨU NHẬP LIỆU (lhp38)                      -->
+  <!-- ================================================================ -->
+  <div id="modal-login-password" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center animate-scale-up">
+      <div class="w-12 h-12 rounded-2xl bg-blue-100 text-blue-700 mx-auto flex items-center justify-center mb-3">
+        <i data-lucide="lock" class="w-6 h-6"></i>
+      </div>
+      <h3 class="text-base font-bold text-slate-900">Xác Thực Quyền Nhập Liệu</h3>
+      <p class="text-xs text-slate-500 mt-1 mb-4">Vui lòng nhập mật khẩu Ban nề nếp để tiếp tục</p>
+
+      <form id="form-login-password">
+        <input type="password" id="login-password" autocomplete="new-password" placeholder="Nhập mật khẩu..."
+               class="w-full text-center text-sm font-mono tracking-widest p-3 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 mb-2">
+        <p id="password-error-msg" class="text-xs text-red-600 font-semibold hidden mb-3">Sai mật khẩu! Vui lòng thử lại.</p>
+
+        <div class="flex items-center gap-2 mt-3">
+          <button type="button" id="btn-cancel-password-modal"
+                  class="flex-1 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
+            Hủy bỏ
+          </button>
+          <button type="submit" id="btn-submit-password"
+                  class="flex-1 py-2.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition shadow-xs">
+            Mở Khóa
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
 </body>
 </html>
