@@ -1915,8 +1915,28 @@ class DisciplineApp {
     const modalPass = document.getElementById('modal-login-password');
     const formPass = document.getElementById('form-login-password');
     const btnCancel = document.getElementById('btn-cancel-password-modal');
+    const inputPass = document.getElementById('login-password');
 
     this.updateLockStatusUI();
+
+    if (inputPass) {
+      // Tắt triệt để tính năng gợi ý và lưu mật khẩu của trình duyệt
+      inputPass.setAttribute('autocomplete', 'off');
+      inputPass.setAttribute('autocorrect', 'off');
+      inputPass.setAttribute('autocapitalize', 'off');
+      inputPass.setAttribute('spellcheck', 'false');
+
+      // Tự động xóa viền đỏ khi người dùng bắt đầu gõ lại
+      inputPass.addEventListener('input', () => {
+        const err = document.getElementById('password-error-msg');
+        if (err) {
+          err.classList.add('hidden');
+          err.style.display = 'none';
+        }
+        inputPass.classList.remove('border-red-500', 'bg-red-50');
+        inputPass.classList.add('border-slate-300');
+      });
+    }
 
     if (btnToggleLock) {
       btnToggleLock.onclick = (e) => {
@@ -2016,12 +2036,15 @@ class DisciplineApp {
     const err = document.getElementById('password-error-msg');
     
     if (err) {
+      err.textContent = 'Sai mật khẩu';
       err.classList.add('hidden');
       err.style.display = 'none';
     }
     if (input) {
       input.value = '';
-      input.setAttribute('autocomplete', 'new-password');
+      input.setAttribute('autocomplete', 'off');
+      input.classList.remove('border-red-500', 'bg-red-50');
+      input.classList.add('border-slate-300');
     }
     if (modal) {
       modal.classList.remove('hidden');
@@ -2044,9 +2067,12 @@ class DisciplineApp {
     if (err) {
       err.classList.add('hidden');
       err.style.display = 'none';
+      err.textContent = 'Sai mật khẩu';
     }
     if (input) {
       input.value = '';
+      input.classList.remove('border-red-500', 'bg-red-50');
+      input.classList.add('border-slate-300');
     }
     this.pendingAction = null;
   }
@@ -2059,10 +2085,12 @@ class DisciplineApp {
     if (entered === this.PASSWORD_CONFIG) {
       sessionStorage.setItem('data_entry_unlocked', 'true');
       this.updateLockStatusUI();
+      
+      // 1. Hiển thị thông báo "Đăng nhập thành công"
       this.showToast('Đăng nhập thành công!', 'success');
-      setTimeout(() => {
-        this.closePasswordModal();
-      }, 500);
+      
+      // 2. Tự động đóng (ẩn) hộp thoại đăng nhập ngay lập tức
+      this.closePasswordModal();
 
       if (typeof this.pendingAction === 'function') {
         const action = this.pendingAction;
@@ -2070,67 +2098,281 @@ class DisciplineApp {
         action();
       }
     } else {
+      // 3. Nếu sai mật khẩu, hiển thị rõ thông báo "Sai mật khẩu" trực tiếp trên box để người dùng biết
       if (err) {
-        err.textContent = 'Đăng nhập không thành công!';
+        err.textContent = 'Sai mật khẩu';
         err.classList.remove('hidden');
         err.style.display = 'block';
       }
-      this.showToast('Đăng nhập không thành công!', 'error');
       if (input) {
+        input.classList.remove('border-slate-300');
+        input.classList.add('border-red-500', 'bg-red-50');
         input.select();
         input.focus();
       }
+      this.showToast('Sai mật khẩu! Vui lòng thử lại.', 'error');
     }
   }
 
   requirePassword(onSuccess) {
     if (this.isDataEntryUnlocked()) {
-      onSuccess();
+      if (typeof onSuccess === 'function') onSuccess();
     } else {
       this.openPasswordModal(onSuccess);
     }
   }
 
-  // ==================== ĐỒNG BỘ DỮ LIỆU ĐÁM MÂY (GITHUB / VERCEL & LOCAL) ====================
+  // ==================== CƠ SỞ DỮ LIỆU ĐÁM MÂY (CLOUD DATABASE) ====================
 
-  async syncCloudData(silent = false) {
-    const btn = document.getElementById('btn-cloud-sync');
-    if (btn) btn.classList.add('animate-pulse');
+  get DEFAULT_CLOUD_URL() {
+    return 'https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/violations';
+  }
+
+  getCloudUrl() {
+    return localStorage.getItem('dshs_cloud_url') || this.DEFAULT_CLOUD_URL;
+  }
+
+  setCloudUrl(url) {
+    if (url && url.trim()) {
+      localStorage.setItem('dshs_cloud_url', url.trim());
+    } else {
+      localStorage.removeItem('dshs_cloud_url');
+    }
+  }
+
+  loadDeletedViolationIds() {
+    try {
+      const saved = localStorage.getItem('dshs_deleted_violations_ids');
+      return new Set(saved ? JSON.parse(saved) : []);
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  trackDeletedViolationId(id) {
+    if (!id) return;
+    this.deletedViolationIds.add(String(id));
+    try {
+      localStorage.setItem('dshs_deleted_violations_ids', JSON.stringify(Array.from(this.deletedViolationIds)));
+    } catch (e) {}
+  }
+
+  updateCloudStatusBadge(isOnline = true) {
+    const badge = document.getElementById('cloud-sync-badge');
+    const indicatorText = document.getElementById('cloud-status-indicator-text');
+    const indicator = document.getElementById('cloud-status-indicator');
+
+    if (badge) {
+      badge.className = isOnline 
+        ? 'w-2 h-2 rounded-full bg-emerald-500' 
+        : 'w-2 h-2 rounded-full bg-amber-500';
+      badge.title = isOnline 
+        ? 'Cloud Database: Đang kết nối thông suốt' 
+        : 'Cloud Database: Ngoại tuyến (Đã lưu trên máy)';
+    }
+
+    if (indicatorText) {
+      indicatorText.textContent = isOnline ? 'Đang kết nối' : 'Ngoại tuyến';
+    }
+    if (indicator) {
+      indicator.className = isOnline
+        ? 'text-[11px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5'
+        : 'text-[11px] font-bold text-amber-700 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5';
+    }
+  }
+
+  async pushToCloud(silent = true) {
+    const cloudUrl = this.getCloudUrl();
+    if (!cloudUrl) return false;
 
     try {
-      const res = await fetch(`./data_violations.json?t=${Date.now()}`);
+      let method = 'POST';
+      let headers = { 'Content-Type': 'application/json' };
+
+      // Hỗ trợ Firebase Realtime Database REST API (sử dụng method PUT)
+      if (cloudUrl.includes('.firebaseio.com') || cloudUrl.includes('.firebasedatabase.app')) {
+        method = 'PUT';
+      }
+
+      const res = await fetch(cloudUrl, {
+        method: method,
+        headers: headers,
+        body: JSON.stringify(this.violations)
+      });
+
       if (res.ok) {
-        const cloudViolations = await res.json();
-        if (Array.isArray(cloudViolations) && cloudViolations.length > 0) {
-          const existingIds = new Set(this.violations.map(v => String(v.id)));
-          let added = 0;
-          for (const cv of cloudViolations) {
-            if (!existingIds.has(String(cv.id))) {
-              this.violations.push(cv);
-              existingIds.add(String(cv.id));
-              added++;
-            }
-          }
-          if (added > 0) {
-            this.saveViolations();
-            this.renderLogsTable();
-            this.renderEmulationTable();
-          }
+        localStorage.setItem('dshs_last_sync_time', new Date().toISOString());
+        this.updateCloudStatusBadge(true);
+        if (!silent) {
+          this.showToast(`Đã đồng bộ an toàn ${this.violations.length} bản ghi vi phạm lên Cloud!`, 'success');
+        }
+        return true;
+      } else {
+        console.warn('Cloud Database push returned status:', res.status);
+        this.updateCloudStatusBadge(false);
+        return false;
+      }
+    } catch (err) {
+      console.warn('Không thể gửi dữ liệu lên Cloud Database:', err);
+      this.updateCloudStatusBadge(false);
+      return false;
+    }
+  }
+
+  async pullAndMergeFromCloud(silent = true) {
+    const cloudUrl = this.getCloudUrl();
+    if (!cloudUrl) return false;
+
+    try {
+      const res = await fetch(`${cloudUrl}?t=${Date.now()}`);
+      if (!res.ok) {
+        return false;
+      }
+
+      let cloudData = await res.json();
+      if (!Array.isArray(cloudData)) {
+        if (cloudData && typeof cloudData === 'object') {
+          cloudData = Object.values(cloudData);
+        } else {
+          cloudData = [];
         }
       }
 
-      this.saveViolations();
+      const localMap = new Map();
+      const deletedSet = this.deletedViolationIds;
 
-      if (!silent) {
-        this.showToast('Đồng bộ dữ liệu thời gian thực thành công!', 'success');
+      // 1. Nạp danh sách vi phạm cục bộ hiện hành (bỏ qua những id đã bị xóa)
+      this.violations.forEach(v => {
+        if (v && v.id && !deletedSet.has(String(v.id))) {
+          localMap.set(String(v.id), v);
+        }
+      });
+
+      let hasNewFromCloud = false;
+
+      // 2. Hợp nhất dữ liệu mới từ Cloud (từ các thiết bị khác như điện thoại)
+      cloudData.forEach(cv => {
+        if (cv && cv.id && !deletedSet.has(String(cv.id))) {
+          if (!localMap.has(String(cv.id))) {
+            localMap.set(String(cv.id), cv);
+            hasNewFromCloud = true;
+          }
+        }
+      });
+
+      // 3. Sắp xếp lại danh sách hợp nhất theo thứ tự thời gian/ID
+      const mergedList = Array.from(localMap.values()).sort((a, b) => {
+        const dateA = new Date(a.date || 0).getTime();
+        const dateB = new Date(b.date || 0).getTime();
+        if (dateB !== dateA) return dateB - dateA;
+        return (b.id || 0) - (a.id || 0);
+      });
+
+      const oldCount = this.violations.length;
+      this.violations = mergedList;
+      localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+      this.updateBadges();
+
+      if (hasNewFromCloud || mergedList.length !== oldCount) {
+        this.renderLogsTable();
+        this.renderEmulationTable();
+        // Đẩy lại toàn bộ danh sách hợp nhất lên Cloud để 2 bên đồng nhất 100%
+        this.pushToCloud(true);
+      }
+
+      localStorage.setItem('dshs_last_sync_time', new Date().toISOString());
+      this.updateCloudStatusBadge(true);
+      return true;
+    } catch (err) {
+      console.warn('Lỗi khi tải dữ liệu từ Cloud Database:', err);
+      this.updateCloudStatusBadge(false);
+      return false;
+    }
+  }
+
+  async syncCloudData(silent = false) {
+    if (this.isSyncingCloud) return;
+    this.isSyncingCloud = true;
+
+    const btn = document.getElementById('btn-cloud-sync');
+    const icon = document.getElementById('cloud-sync-icon');
+    const text = document.getElementById('cloud-sync-text');
+
+    if (btn) btn.classList.add('opacity-75');
+    if (icon) icon.classList.add('animate-spin');
+    if (text) text.textContent = 'Đang đồng bộ...';
+
+    try {
+      const pullSuccess = await this.pullAndMergeFromCloud(silent);
+      if (pullSuccess) {
+        await this.pushToCloud(true);
+        if (!silent) {
+          this.showToast(`Đồng bộ Cloud thành công! Có ${this.violations.length} bản ghi vi phạm được bảo vệ an toàn.`, 'success');
+        }
+      } else {
+        // Nếu không kéo được, thử đẩy dữ liệu hiện có lên cloud
+        const pushSuccess = await this.pushToCloud(true);
+        if (pushSuccess && !silent) {
+          this.showToast(`Đã đồng bộ ${this.violations.length} bản ghi vi phạm lên Cloud!`, 'success');
+        } else if (!silent) {
+          this.showToast('Không thể kết nối Cloud. Đang hoạt động Offline (Dữ liệu đã lưu an toàn trên máy).', 'warning');
+        }
       }
     } catch (err) {
-      console.warn('Lỗi khi đồng bộ dữ liệu đám mây:', err);
+      console.warn('Lỗi đồng bộ Cloud:', err);
       if (!silent) {
-        this.showToast('Đã lưu dữ liệu trên thiết bị.', 'info');
+        this.showToast('Dữ liệu vi phạm đã được bảo toàn an toàn trên máy!', 'info');
       }
     } finally {
-      if (btn) btn.classList.remove('animate-pulse');
+      this.isSyncingCloud = false;
+      if (btn) btn.classList.remove('opacity-75');
+      if (icon) icon.classList.remove('animate-spin');
+      if (text) text.textContent = 'Đồng bộ Cloud';
+      this.updateCloudStatusBadge(true);
+    }
+  }
+
+  async testCloudConnection() {
+    const inputUrl = document.getElementById('input-cloud-url');
+    const url = inputUrl ? inputUrl.value.trim() : this.getCloudUrl();
+    if (!url) {
+      this.showToast('Vui lòng nhập địa chỉ Cloud Endpoint!', 'error');
+      return;
+    }
+
+    this.showToast('Đang kiểm tra kết nối Cloud Database...', 'info');
+    try {
+      const res = await fetch(`${url}?t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        const count = Array.isArray(data) ? data.length : (data && typeof data === 'object' ? Object.keys(data).length : 0);
+        this.setCloudUrl(url);
+        this.updateCloudStatusBadge(true);
+        this.showToast(`Kết nối Cloud thành công! Tìm thấy ${count} bản ghi vi phạm trên Đám mây.`, 'success');
+        this.syncCloudData(true);
+      } else {
+        this.updateCloudStatusBadge(false);
+        this.showToast(`Không thể kết nối Cloud (Mã phản hồi HTTP ${res.status})`, 'error');
+      }
+    } catch (e) {
+      this.updateCloudStatusBadge(false);
+      this.showToast(`Lỗi kết nối: ${e.message}`, 'error');
+    }
+  }
+
+  exportViolationsBackupJson() {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.violations, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const today = new Date().toISOString().slice(0, 10);
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `Sao_luu_vi_pham_THPT_LHP_${today}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      this.showToast('Đã tải file sao lưu JSON về máy!', 'success');
+    } catch (e) {
+      this.showToast('Không thể xuất file sao lưu: ' + e.message, 'error');
     }
   }
 

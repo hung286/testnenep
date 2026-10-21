@@ -76,10 +76,11 @@
         </div>
 
         <!-- Cloud Sync Button -->
-        <button id="btn-cloud-sync" title="Đồng bộ dữ liệu thời gian thực với Cloud/GitHub" 
-                class="flex items-center gap-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-bold px-2.5 py-1.5 rounded-xl transition shadow-xs">
-          <i data-lucide="cloud" class="w-3.5 h-3.5 text-blue-600"></i>
-          <span class="hidden sm:inline">Đồng bộ</span>
+        <button id="btn-cloud-sync" title="Đồng bộ dữ liệu thời gian thực giữa Điện thoại và Máy tính qua Cloud Database" 
+                class="flex items-center gap-1.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition shadow-xs cursor-pointer min-h-[44px]">
+          <i id="cloud-sync-icon" data-lucide="cloud" class="w-4 h-4 text-blue-600"></i>
+          <span id="cloud-sync-text" class="hidden sm:inline">Đồng bộ Cloud</span>
+          <span id="cloud-sync-badge" class="w-2 h-2 rounded-full bg-emerald-500" title="Cloud Database hoạt động"></span>
         </button>
 
         <!-- Lock / Unlock Status Button for Data Entry -->
@@ -429,10 +430,7 @@
             <span>Xuất Excel (.xlsx)</span>
           </button>
 
-          <button id="btn-clear-all-logs" class="flex items-center gap-1 px-2.5 py-1.5 text-red-600 hover:bg-red-50 font-medium rounded-lg transition" title="Xóa toàn bộ nhật ký vi phạm">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          </button>
-        </div>
+          </div>
 
       </div>
 
@@ -601,7 +599,7 @@
           </button>
 
           <!-- Reset Default Button -->
-          <button id="btn-reset-default-students" class="text-slate-400 hover:text-red-600 p-1.5 rounded transition" title="Khôi phục danh sách gốc THPT Lê Hồng Phong">
+          <button id="btn-reset-default-students" class="text-slate-400 hover:text-red-600 p-1.5 rounded transition" title="Khôi phục danh sách 1.226 học sinh gốc (Dữ liệu vi phạm đã ghi nhận vẫn được bảo toàn an toàn 100%)">
             <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
           </button>
         </div>
@@ -653,7 +651,7 @@
             <span>Thêm Lỗi Quy Định Mới</span>
           </button>
 
-          <button id="btn-reset-default-rules" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition" title="Khôi phục danh mục 33 lỗi gốc của trường">
+          <button id="btn-reset-default-rules" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition" title="Khôi phục danh mục 33 lỗi gốc của trường (Dữ liệu vi phạm đã ghi nhận vẫn được bảo toàn an toàn 100%)">
             <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
             <span>Khôi Phục Mặc Định</span>
           </button>
@@ -800,6 +798,43 @@
             <p class="text-[11px] text-blue-700 leading-relaxed">
               Nếu model được chọn gặp lỗi hoặc quá tải (429 RESOURCE_EXHAUSTED), hệ thống sẽ <strong>tự động thử lại</strong> với model tiếp theo theo chuỗi mà không làm mất dữ liệu đã nhập.
             </p>
+          </div>
+        </div>
+
+      <!-- Cloud Database Configuration Section -->
+        <div class="pt-4 border-t border-slate-200">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="database" class="w-4 h-4 text-blue-600"></i>
+              <span>Cơ Sở Dữ Liệu Đám Mây (Cloud Database)</span>
+            </label>
+            <span id="cloud-status-indicator" class="text-[11px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="cloud-status-indicator-text">Đang kết nối</span>
+            </span>
+          </div>
+          <p class="text-[11px] text-slate-500 mb-2">
+            Hệ thống tự động lưu trữ và đồng bộ 2 chiều tức thì giữa <strong>Điện thoại</strong> và <strong>Máy tính</strong>. Mọi thao tác thêm/xóa vi phạm đều được bảo vệ an toàn trên Đám mây.
+          </p>
+
+          <div class="space-y-2">
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600 block mb-1">Địa chỉ Cloud Endpoint (KVDB / Firebase Realtime / REST API):</label>
+              <input type="text" id="input-cloud-url" placeholder="https://kvdb.io/... hoặc https://<project>.firebaseio.com/violations.json"
+                     class="w-full text-xs font-mono p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+            </div>
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+              <button type="button" id="btn-test-cloud-connection" 
+                      class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Kiểm tra & Đồng bộ ngay</span>
+              </button>
+              <button type="button" id="btn-backup-violations-json" 
+                      class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                <span>Tải file sao lưu JSON</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -950,10 +985,24 @@
       <h3 class="text-lg md:text-xl font-bold text-slate-900">Đăng Nhập Ban Nề Nếp</h3>
       <p class="text-xs md:text-sm text-slate-500 mt-1 mb-5">Vui lòng nhập mật khẩu để mở khóa quyền thêm, sửa, xóa dữ liệu</p>
 
-      <form id="form-login-password" onsubmit="event.preventDefault(); window.app && window.app.submitPassword(); return false;">
-        <input type="password" id="login-password" autocomplete="new-password" placeholder="Nhập mật khẩu lhp38..."
-               class="w-full text-center text-base md:text-lg font-mono tracking-widest p-4 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 mb-2">
-        <p id="password-error-msg" class="text-xs md:text-sm text-red-600 font-bold hidden mb-3">Đăng nhập không thành công!</p>
+      <form id="form-login-password" autocomplete="off" onsubmit="event.preventDefault(); window.app && window.app.submitPassword(); return false;">
+        <!-- Hidden decoy inputs to neutralize browser password save prompts -->
+        <input type="text" style="display:none" aria-hidden="true" tabindex="-1">
+        <input type="password" style="display:none" aria-hidden="true" tabindex="-1">
+
+        <div class="relative mb-2">
+          <input type="password" id="login-password" 
+                 name="nenep_auth_token_off"
+                 autocomplete="off"
+                 autocorrect="off"
+                 autocapitalize="off"
+                 spellcheck="false"
+                 data-lpignore="true"
+                 data-form-type="other"
+                 placeholder="Nhập mật khẩu lhp38..."
+                 class="w-full text-center text-base md:text-lg font-mono tracking-widest p-4 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 transition">
+        </div>
+        <p id="password-error-msg" class="text-xs md:text-sm text-red-600 font-bold hidden mb-3">Sai mật khẩu</p>
 
         <div class="flex items-center gap-3 mt-4">
           <button type="button" id="btn-cancel-password-modal"
