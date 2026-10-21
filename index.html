@@ -36,7 +36,12 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- SheetJS for Excel Import/Export -->
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="xlsx-style.min.js"></script>
+  <script>
+    if (typeof XLSX === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"><\/script>');
+    }
+  </script>
 
   <!-- Chart.js for Visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -518,6 +523,12 @@
             <i data-lucide="sliders" class="w-3.5 h-3.5 text-slate-600"></i>
             <span class="hidden md:inline">Quản Lý Khóa Tuần</span>
           </button>
+
+          <!-- Nút Admin Mở Khóa Toàn Bộ Các Tuần (Tuần 1 - 6) -->
+          <button id="btn-unlock-all-weeks" onclick="window.app.adminUnlockAllWeeks()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white transition shadow-xs cursor-pointer border border-amber-700" title="Quyền Admin (2806): Mở khóa toàn bộ các tuần (Tuần 1 đến Tuần 6) để quản trị viên chỉnh sửa">
+            <i data-lucide="unlock" class="w-3.5 h-3.5 text-amber-200"></i>
+            <span class="font-extrabold">Mở Khóa Toàn Bộ Tuần</span>
+          </button>
         </div>
 
         <!-- Action Buttons Bar -->
@@ -562,6 +573,9 @@
           </button>
         </div>
       </div>
+
+      <!-- Read-Only / Admin Banner -->
+      <div id="emulation-readonly-banner" class="mb-3"></div>
 
       <!-- Weekly Title & Regulations Banner -->
       <div id="emulation-header-banner" class="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-5 text-white shadow-md relative overflow-hidden">
@@ -1898,6 +1912,10 @@
           </button>
           <button id="btn-open-current-week-only" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition shadow-xs cursor-pointer">
             🔓 Chỉ Mở Tuần Hiện Tại
+          </button>
+          <button id="btn-unlock-all-weeks-modal" onclick="window.app.adminUnlockAllWeeks()" class="px-2.5 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-lg font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5" title="Mở khóa toàn bộ các tuần 1 đến 6">
+            <i data-lucide="unlock" class="w-3.5 h-3.5 text-amber-200"></i>
+            <span>Mở Khóa Toàn Bộ (Tuần 1 - 6)</span>
           </button>
         </div>
       </div>

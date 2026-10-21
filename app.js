@@ -18,6 +18,7 @@ class DisciplineApp {
     // Nạp Bảng thi đua, Điểm cộng & Snapshots sao lưu
     this.emulationWeeks = this.loadEmulationWeeks();
     this.bonusPoints = this.loadBonusPoints();
+    this.weeklyNotes = this.loadWeeklyNotes();
     this.snapshots = this.loadSnapshots();
     this.pendingRestoreData = null;
     
@@ -130,25 +131,59 @@ class DisciplineApp {
     return this.lockedWeeks.includes(w);
   }
 
+  loadWeeklyNotes() {
+    const saved = localStorage.getItem('dshs_weekly_notes');
+    let notes = {};
+    if (saved) {
+      try { notes = JSON.parse(saved); } catch (e) { }
+    }
+    if (window.DEFAULT_WEEKLY_NOTES) {
+      Object.keys(window.DEFAULT_WEEKLY_NOTES).forEach(w => {
+        if (!notes[w] || !Array.isArray(notes[w]) || notes[w].length === 0) {
+          notes[w] = [...window.DEFAULT_WEEKLY_NOTES[w]];
+        }
+      });
+    }
+    return notes;
+  }
+
+  saveWeeklyNotes() {
+    localStorage.setItem('dshs_weekly_notes', JSON.stringify(this.weeklyNotes));
+  }
+
+  adminUnlockAllWeeks() {
+    this.requirePassword(() => {
+      this.lockedWeeks = [];
+      this.saveLockedWeeks();
+      this.renderManageWeeksList();
+      this.renderEmulationTable();
+      this.showToast('Quyền Admin (2806): Đã mở khóa toàn bộ các tuần (Tuần 01 đến Tuần 06)! Thầy/cô có thể chỉnh sửa dữ liệu của tất cả các tuần.', 'success');
+    });
+  }
+
   adminUnlockSpecificWeek(weekNum) {
     const w = parseInt(weekNum, 10);
     this.requirePassword(() => {
       this.lockedWeeks = this.lockedWeeks.filter(x => x !== w);
       this.saveLockedWeeks();
       this.renderManageWeeksList();
+      this.renderEmulationTable();
       this.showToast(`Quyền Admin (2806): Đã mở khóa Tuần ${w} thành công! Thầy/cô có thể chỉnh sửa dữ liệu tuần này.`, 'success');
     });
   }
 
   lockSpecificWeek(weekNum) {
-    const w = parseInt(weekNum, 10);
-    if (!this.lockedWeeks.includes(w)) {
-      this.lockedWeeks.push(w);
-      this.lockedWeeks.sort((a, b) => a - b);
-    }
-    this.saveLockedWeeks();
-    this.renderManageWeeksList();
-    this.showToast(`Đã khóa niêm phong Tuần ${w} an toàn!`, 'info');
+    this.requirePassword(() => {
+      const w = parseInt(weekNum, 10);
+      if (!this.lockedWeeks.includes(w)) {
+        this.lockedWeeks.push(w);
+        this.lockedWeeks.sort((a, b) => a - b);
+      }
+      this.saveLockedWeeks();
+      this.renderManageWeeksList();
+      this.renderEmulationTable();
+      this.showToast(`Đã khóa niêm phong Tuần ${w} an toàn!`, 'info');
+    });
   }
 
   handleToggleCurrentWeekLock() {
@@ -587,7 +622,9 @@ class DisciplineApp {
     // Nút chạy AI Parse
     const btnRunAi = document.getElementById('btn-run-ai-parse');
     if (btnRunAi) {
-      btnRunAi.addEventListener('click', () => this.handleRunAiParse());
+      btnRunAi.addEventListener('click', () => {
+        this.requirePassword(() => this.handleRunAiParse());
+      });
     }
 
     // Nút Clear AI Input
@@ -603,7 +640,9 @@ class DisciplineApp {
     // Nút xác nhận lưu vào nhật ký
     const btnConfirmSave = document.getElementById('btn-confirm-save-violations');
     if (btnConfirmSave) {
-      btnConfirmSave.addEventListener('click', () => this.confirmSaveAiViolations());
+      btnConfirmSave.addEventListener('click', () => {
+        this.requirePassword(() => this.confirmSaveAiViolations());
+      });
     }
 
     // Nút hủy xem trước
@@ -685,13 +724,15 @@ class DisciplineApp {
     const inputExcelImp = document.getElementById('input-emulation-excel-file');
     if (btnOpenExcelImp && inputExcelImp) {
       btnOpenExcelImp.addEventListener('click', () => {
-        const curW = document.getElementById('emulation-select-week').value;
-        if (this.isWeekLocked(curW)) {
-          this.showToast(`Tuần ${curW} đã khóa niêm phong. Không thể import dữ liệu!`, 'error');
-          return;
-        }
-        inputExcelImp.value = '';
-        inputExcelImp.click();
+        this.requirePassword(() => {
+          const curW = document.getElementById('emulation-select-week').value;
+          if (this.isWeekLocked(curW)) {
+            this.showToast(`Tuần ${curW} đã khóa niêm phong. Không thể import dữ liệu!`, 'error');
+            return;
+          }
+          inputExcelImp.value = '';
+          inputExcelImp.click();
+        });
       });
 
       inputExcelImp.addEventListener('change', (e) => {
@@ -1999,81 +2040,167 @@ class DisciplineApp {
     const selectedWeek = parseInt(emuSelect.value, 10) || this.currentWeek;
     const isLocked = this.isWeekLocked(selectedWeek);
     const dateRange = this.getWeekDateRange(selectedWeek);
+    const isAuth = this.isDataEntryUnlocked();
+    const canEdit = isAuth && !isLocked;
 
-    // 1. Cập nhật Badge Trạng Thái Khóa Tuần & Nút Mở Khóa / Khóa Tuần
+    // 1. Cập nhật Banner Chế độ Bảo mật (Chỉ xem) vs Quyền Admin (2806)
+    const readonlyBanner = document.getElementById('emulation-readonly-banner');
+    if (readonlyBanner) {
+      if (!isAuth) {
+        readonlyBanner.innerHTML = `
+          <div class="p-3.5 bg-amber-50 border border-amber-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 shadow-xs">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-amber-200/80 text-amber-800 flex items-center justify-center flex-shrink-0 font-bold">
+                <i data-lucide="shield-alert" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <p class="font-extrabold text-amber-950 text-xs sm:text-sm">Chế độ Bảo mật: Đang ở trạng thái CHỈ XEM (Read-only)</p>
+                <p class="text-[11px] text-amber-800 mt-0.5">Toàn bộ tính năng Thêm, Sửa, Xóa, Nhập điểm, Import file và Khóa/Mở tuần đều bị vô hiệu hóa an toàn. Vui lòng bấm đăng nhập để chuyển sang chế độ quản trị.</p>
+              </div>
+            </div>
+            <button type="button" onclick="window.app.openPasswordModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold rounded-xl text-xs transition cursor-pointer flex-shrink-0 flex items-center justify-center gap-1.5 shadow-xs">
+              <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+              <span>Đăng nhập Admin (2806)</span>
+            </button>
+          </div>
+        `;
+      } else {
+        readonlyBanner.innerHTML = `
+          <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-emerald-950 shadow-xs">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-emerald-200/80 text-emerald-800 flex items-center justify-center flex-shrink-0 font-bold">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <p class="font-extrabold text-emerald-950">Quyền Quản Trị Cấp Cao Đang Kích Hoạt (Mật khẩu Admin 2806)</p>
+                <p class="text-[11px] text-emerald-800">Thầy/cô có toàn quyền Thêm, Sửa, Xóa, Nhập điểm trực tiếp, Import file và Mở khóa toàn bộ các tuần (1 đến 6).</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button type="button" onclick="window.app.adminUnlockAllWeeks()" class="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold rounded-lg text-xs transition cursor-pointer flex items-center gap-1 shadow-xs" title="Mở khóa tất cả các tuần 1 đến 6">
+                <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
+                <span>Mở Khóa Toàn Bộ Tuần</span>
+              </button>
+              <button type="button" onclick="window.app.handleAuthButtonClick()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs transition cursor-pointer shadow-xs">
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // 2. Cập nhật Badge Trạng Thái Khóa Tuần & Nút Mở Khóa / Khóa Tuần
     const statusBadge = document.getElementById('emulation-week-status-badge');
     const btnToggleLock = document.getElementById('btn-toggle-week-lock');
 
     if (statusBadge) {
       if (isLocked) {
         statusBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-amber-50 text-amber-800 border-amber-300';
-        statusBadge.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600"></i><span>🔒 Tuần đã khóa niêm phong (Read-Only)</span>`;
+        statusBadge.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5 text-amber-600"></i><span>🔒 Tuần đã khóa niêm phong</span>`;
       } else {
         statusBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border bg-emerald-50 text-emerald-800 border-emerald-300';
-        statusBadge.innerHTML = `<i data-lucide="unlock" class="w-3.5 h-3.5 text-emerald-600"></i><span>🔓 Đang mở nhập liệu / chỉnh sửa</span>`;
+        statusBadge.innerHTML = `<i data-lucide="unlock" class="w-3.5 h-3.5 text-emerald-600"></i><span>🔓 Tuần đang mở</span>`;
       }
     }
 
     if (btnToggleLock) {
       if (isLocked) {
         btnToggleLock.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition shadow-xs cursor-pointer border border-amber-600';
-        btnToggleLock.innerHTML = `<i data-lucide="unlock" class="w-3.5 h-3.5"></i><span>🔓 Mở Khóa Tuần (Admin)</span>`;
+        btnToggleLock.innerHTML = `<i data-lucide="unlock" class="w-3.5 h-3.5"></i><span>Mở Khóa Tuần (Admin)</span>`;
         btnToggleLock.title = 'Quyền Admin (2806): Mở khóa tuần này để chỉnh sửa dữ liệu';
       } else {
         btnToggleLock.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 hover:bg-slate-800 text-slate-100 transition shadow-xs cursor-pointer border border-slate-600';
-        btnToggleLock.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5"></i><span>🔒 Khóa Tuần Này</span>`;
+        btnToggleLock.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5"></i><span>Khóa Tuần Này</span>`;
         btnToggleLock.title = 'Khóa niêm phong an toàn tuần này sau khi hoàn tất';
       }
+      btnToggleLock.onclick = () => this.handleToggleCurrentWeekLock();
     }
 
-    // 2. Bật/Tắt các nút thao tác theo trạng thái khóa
+    // 3. Bật/Tắt các nút thao tác theo trạng thái khóa & quyền Admin
     const btnAddBonus = document.getElementById('btn-add-bonus-point');
     const btnImport = document.getElementById('btn-open-excel-import');
     const btnSaveTable = document.getElementById('btn-save-emulation-table');
+    
     if (btnAddBonus) {
-      btnAddBonus.disabled = isLocked;
-      btnAddBonus.className = isLocked ? 
-        'flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 font-bold rounded-lg cursor-not-allowed' :
-        'flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition shadow-xs cursor-pointer';
-    }
-    if (btnImport) {
-      btnImport.disabled = isLocked;
-      btnImport.className = isLocked ?
-        'flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 font-bold rounded-lg cursor-not-allowed' :
-        'flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition shadow-xs cursor-pointer';
-    }
-    if (btnSaveTable) {
-      btnSaveTable.disabled = isLocked;
-      btnSaveTable.className = isLocked ?
-        'flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 font-bold rounded-lg cursor-not-allowed' :
-        'flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition shadow-xs cursor-pointer';
+      if (!isAuth) {
+        btnAddBonus.disabled = false;
+        btnAddBonus.className = 'flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold rounded-lg transition shadow-xs cursor-pointer border border-slate-300';
+        btnAddBonus.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5 text-amber-500"></i><span>+ Điểm Cộng TB (Cần Đăng Nhập)</span>`;
+        btnAddBonus.onclick = () => this.requirePassword(() => this.openBonusModal());
+      } else if (isLocked) {
+        btnAddBonus.disabled = true;
+        btnAddBonus.className = 'flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 font-bold rounded-lg cursor-not-allowed border border-slate-200';
+        btnAddBonus.innerHTML = `<i data-lucide="plus-circle" class="w-3.5 h-3.5"></i><span>+ Điểm Cộng TB</span>`;
+        btnAddBonus.onclick = null;
+      } else {
+        btnAddBonus.disabled = false;
+        btnAddBonus.className = 'flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition shadow-xs cursor-pointer';
+        btnAddBonus.innerHTML = `<i data-lucide="plus-circle" class="w-3.5 h-3.5"></i><span>+ Điểm Cộng TB</span>`;
+        btnAddBonus.onclick = () => this.openBonusModal();
+      }
     }
 
-    // 3. Cập nhật Banner Tiêu đề
+    if (btnImport) {
+      if (!isAuth) {
+        btnImport.disabled = false;
+        btnImport.className = 'flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold rounded-lg transition shadow-xs cursor-pointer border border-slate-300';
+        btnImport.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5 text-amber-500"></i><span>📥 Import Excel (Cần Đăng Nhập)</span>`;
+        btnImport.onclick = () => this.requirePassword(() => this.openExcelImportModal());
+      } else if (isLocked) {
+        btnImport.disabled = true;
+        btnImport.className = 'flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 font-bold rounded-lg cursor-not-allowed border border-slate-200';
+        btnImport.innerHTML = `<i data-lucide="upload" class="w-3.5 h-3.5"></i><span>📥 Import Excel Tuần</span>`;
+        btnImport.onclick = null;
+      } else {
+        btnImport.disabled = false;
+        btnImport.className = 'flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition shadow-xs cursor-pointer';
+        btnImport.innerHTML = `<i data-lucide="upload" class="w-3.5 h-3.5"></i><span>📥 Import Excel Tuần</span>`;
+        btnImport.onclick = () => this.openExcelImportModal();
+      }
+    }
+
+    if (btnSaveTable) {
+      if (!isAuth) {
+        btnSaveTable.disabled = false;
+        btnSaveTable.className = 'flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold rounded-lg transition shadow-xs cursor-pointer border border-slate-300';
+        btnSaveTable.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5 text-amber-500"></i><span>Lưu Bảng (Cần Đăng Nhập)</span>`;
+        btnSaveTable.onclick = () => this.requirePassword(() => this.handleSaveEmulationTable());
+      } else if (isLocked) {
+        btnSaveTable.disabled = true;
+        btnSaveTable.className = 'flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-400 font-bold rounded-lg cursor-not-allowed border border-slate-200';
+        btnSaveTable.innerHTML = `<i data-lucide="save" class="w-3.5 h-3.5"></i><span>Lưu Bảng</span>`;
+        btnSaveTable.onclick = null;
+      } else {
+        btnSaveTable.disabled = false;
+        btnSaveTable.className = 'flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition shadow-xs cursor-pointer';
+        btnSaveTable.innerHTML = `<i data-lucide="save" class="w-3.5 h-3.5"></i><span>Lưu Bảng</span>`;
+        btnSaveTable.onclick = () => this.handleSaveEmulationTable();
+      }
+    }
+
+    // 4. Cập nhật Banner Tiêu đề
     const bannerTitle = document.getElementById('emulation-banner-title');
     const bannerDates = document.getElementById('emulation-banner-dates');
     if (bannerTitle) bannerTitle.textContent = `TỔNG HỢP THI ĐUA TUẦN ${String(selectedWeek).padStart(2, '0')}`;
     if (bannerDates) bannerDates.textContent = dateRange;
 
-    // 4. Tính toán kết quả cho 29 lớp
+    // 5. Tính toán kết quả cho 29 lớp
     const ranked = this.calculateWeeklyEmulationRankings(selectedWeek);
 
-    // 5. Render từng dòng trong tbody (Chuẩn 21 cột truyền thống - ẨN CỘT ĐIỂM CỘNG RIÊNG)
+    // 6. Render từng dòng trong tbody (Chuẩn 21 cột truyền thống - ẨN CỘT ĐIỂM CỘNG RIÊNG)
     tbody.innerHTML = ranked.map(r => {
-      // Huy hiệu Vị thứ chung cuộc
       let rankBadge = `<span class="font-extrabold text-slate-700">${r.viThuChung}</span>`;
       if (r.viThuChung === 1) rankBadge = `<span class="rank-1 px-2 py-0.5 rounded-full font-extrabold text-[11px] shadow-xs">🥇 1</span>`;
       else if (r.viThuChung === 2) rankBadge = `<span class="rank-2 px-2 py-0.5 rounded-full font-extrabold text-[11px] shadow-xs">🥈 2</span>`;
       else if (r.viThuChung === 3) rankBadge = `<span class="rank-3 px-2 py-0.5 rounded-full font-extrabold text-[11px] shadow-xs">🥉 3</span>`;
 
-      // Huy hiệu Xếp loại
       let xepLoaiClass = 'bg-slate-100 text-slate-700 border-slate-300';
       if (r.xepLoai === 'X sắc') xepLoaiClass = 'bg-emerald-100 text-emerald-900 border-emerald-300 font-extrabold';
       else if (r.xepLoai === 'Giỏi') xepLoaiClass = 'bg-blue-100 text-blue-900 border-blue-300 font-bold';
       else if (r.xepLoai === 'Khá') xepLoaiClass = 'bg-amber-100 text-amber-900 border-amber-300 font-bold';
       else if (r.xepLoai === 'T.bình') xepLoaiClass = 'bg-rose-100 text-rose-900 border-rose-300 font-semibold';
 
-      // Nút xem chi tiết điểm trừ
       const diemTruBadge = `
         <button type="button" onclick="window.app.viewClassViolations(${selectedWeek}, '${r.className}')" 
                 class="px-2 py-0.5 rounded font-extrabold text-xs cursor-pointer transition ${r.diemTru > 0 ? 'bg-red-50 text-red-600 border border-red-200 hover:bg-red-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}"
@@ -2082,22 +2209,38 @@ class DisciplineApp {
         </button>
       `;
 
-      // Cột thao tác sửa nhanh
-      const actionCol = isLocked ? `
-        <span class="text-[11px] text-slate-400 flex items-center justify-center gap-1 font-semibold" title="Tuần đã khóa niêm phong">
-          <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-        </span>
-      ` : `
-        <button type="button" onclick="window.app.openEditClassModal(${selectedWeek}, '${r.className}')"
-                class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
-                title="Sửa nhanh thông tin lớp ${r.className}">
-          <i data-lucide="edit-2" class="w-3 h-3"></i>
-          <span>Sửa</span>
-        </button>
-      `;
+      let actionCol = '';
+      if (!isAuth) {
+        actionCol = `
+          <button type="button" onclick="window.app.requirePassword(() => window.app.openEditClassModal(${selectedWeek}, '${r.className}'))"
+                  class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                  title="Cần đăng nhập Admin (2806) để sửa">
+            <i data-lucide="lock" class="w-3 h-3 text-amber-500"></i>
+            <span>Chỉ xem</span>
+          </button>
+        `;
+      } else if (isLocked) {
+        actionCol = `
+          <button type="button" onclick="window.app.adminUnlockSpecificWeek(${selectedWeek})"
+                  class="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                  title="Tuần đã khóa. Bấm để mở khóa tuần này">
+            <i data-lucide="lock" class="w-3 h-3"></i>
+            <span>Mở tuần</span>
+          </button>
+        `;
+      } else {
+        actionCol = `
+          <button type="button" onclick="window.app.openEditClassModal(${selectedWeek}, '${r.className}')"
+                  class="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                  title="Sửa nhanh thông tin lớp ${r.className}">
+            <i data-lucide="edit-2" class="w-3 h-3"></i>
+            <span>Sửa</span>
+          </button>
+        `;
+      }
 
       const renderCell = (field, val, step = '1') => {
-        if (isLocked) {
+        if (!canEdit) {
           return `<span class="font-semibold text-slate-800">${val}</span>`;
         }
         return `
@@ -2114,12 +2257,10 @@ class DisciplineApp {
           <td class="text-center font-extrabold text-slate-900 bg-slate-50/60">${r.className}</td>
           <td class="font-medium text-slate-700 text-xs truncate max-w-[150px]" title="${r.gvcn}">${r.gvcn}</td>
           
-          <!-- Cột GVCN SHL -->
           <td class="text-center bg-blue-50/30 border-x border-blue-100">
             ${renderCell('shl', r.shl, '0.5')}
           </td>
 
-          <!-- Giờ Học Tập ABCD -->
           <td class="text-center bg-indigo-50/20">${renderCell('tot', r.tot)}</td>
           <td class="text-center bg-indigo-50/20">${renderCell('gioA', r.gioA)}</td>
           <td class="text-center bg-indigo-50/20">${renderCell('gioB', r.gioB)}</td>
@@ -2129,17 +2270,14 @@ class DisciplineApp {
           <td class="text-center font-extrabold text-indigo-950 bg-indigo-50/60">${r.diemTbHocTap.toFixed(2)}</td>
           <td class="text-center font-bold text-indigo-900 bg-indigo-50/40">${r.viThuHocTap}</td>
 
-          <!-- Nề nếp -->
           <td class="text-center bg-rose-50/20">${renderCell('diem15', r.diem15, '0.1')}</td>
           <td class="text-center bg-rose-50/30">${diemTruBadge}</td>
           <td class="text-center font-extrabold text-rose-950 bg-rose-50/50">${r.tbNenNep.toFixed(2)}</td>
           <td class="text-center font-bold text-rose-900 bg-rose-50/30">${r.viThuNenNep}</td>
 
-          <!-- HS Vắng -->
           <td class="text-center bg-slate-50/50">${renderCell('hsVang', r.hsVang)}</td>
           <td class="text-center font-bold text-slate-700 bg-slate-50/50">${r.viThuVang}</td>
 
-          <!-- Tổng hợp chung (Cột Điểm cộng đã ẩn, TB Chung đã bao gồm điểm cộng) -->
           <td class="text-center font-extrabold text-emerald-950 bg-emerald-50/50 text-sm">
             ${r.tbChung.toFixed(2)}
             ${r.bonus > 0 ? `<span class="ml-1 text-[11px] text-amber-600 font-bold" title="Đã gồm +${r.bonus}đ điểm cộng (xem ghi chú dưới bảng)">*</span>` : ''}
@@ -2155,23 +2293,80 @@ class DisciplineApp {
       `;
     }).join('');
 
-    // 6. Tự động tổng hợp và hiển thị phần Ghi chú dưới bảng
+    // 7. Tự động tổng hợp và hiển thị phần Ghi chú & Thống kê dưới bảng
     const notesContent = document.getElementById('emulation-notes-content');
     if (notesContent) {
       const bonusList = this.getBonusPointsList(selectedWeek);
-      if (!bonusList || bonusList.length === 0) {
-        notesContent.innerHTML = '<p class="text-slate-400 italic">Tuần này không có lớp nào được cộng điểm thưởng.</p>';
-      } else {
-        notesContent.innerHTML = bonusList.map(b => `
-          <div class="flex items-start gap-2 font-medium text-slate-800">
-            <span class="text-amber-600 font-bold">•</span>
-            <span><strong>Lớp ${b.className}</strong> cộng <strong>${b.points}đ</strong>, lý do: <em>${b.reason || 'thực hiện công trình tự giác'}</em>.</span>
+      const weeklyNotesList = (this.weeklyNotes && this.weeklyNotes[String(selectedWeek)]) || [];
+
+      let notesHtml = '';
+
+      // Thống kê chuẩn đặc thù Tuần 4
+      if (selectedWeek === 4) {
+        notesHtml += `
+          <div class="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xl mb-3 text-xs text-blue-950">
+            <div class="flex items-center gap-2 font-bold text-blue-900 mb-2">
+              <i data-lucide="award" class="w-4 h-4 text-blue-700"></i>
+              <span>THỐNG KÊ XẾP LOẠI & NỀN NẾP TUẦN 04 (LƯU TRỮ CHUẨN NĂM HỌC):</span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-slate-800">
+              <div class="bg-white p-2.5 rounded-lg border border-blue-100 shadow-2xs font-medium">
+                <span class="text-slate-500 block text-[10px]">Tổng học sinh vắng:</span>
+                <strong class="text-sm text-blue-800">163 lượt</strong>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-blue-100 shadow-2xs font-medium">
+                <span class="text-slate-500 block text-[10px]">Lớp Xuất sắc:</span>
+                <strong class="text-sm text-emerald-700">6 lớp</strong>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-blue-100 shadow-2xs font-medium">
+                <span class="text-slate-500 block text-[10px]">Lớp Giỏi:</span>
+                <strong class="text-sm text-blue-700">20 lớp</strong>
+              </div>
+              <div class="bg-white p-2.5 rounded-lg border border-blue-100 shadow-2xs font-medium">
+                <span class="text-slate-500 block text-[10px]">Lớp Khá / Trung bình:</span>
+                <strong class="text-sm text-amber-700">1 Khá | 1 T.bình</strong>
+              </div>
+            </div>
           </div>
-        `).join('');
+        `;
       }
+
+      if (bonusList && bonusList.length > 0) {
+        notesHtml += `
+          <div class="space-y-1.5">
+            <p class="text-xs font-bold text-slate-800 flex items-center gap-1.5 mb-1">
+              <i data-lucide="gift" class="w-3.5 h-3.5 text-amber-600"></i>
+              <span>Điểm cộng thi đua vào Trung Bình chung (Ghi nhận dưới bảng):</span>
+            </p>
+            ${bonusList.map(b => `
+              <div class="flex items-start gap-2 font-medium text-slate-800 text-xs">
+                <span class="text-amber-600 font-bold">•</span>
+                <span><strong>Lớp ${b.className}</strong> cộng <strong>${b.points}đ</strong>, lý do: <em>${b.reason || 'thực hiện công trình tự giác'}</em>.</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (selectedWeek !== 4) {
+        notesHtml += '<p class="text-slate-400 italic text-xs">Tuần này không có lớp nào được cộng điểm thưởng.</p>';
+      }
+
+      if (weeklyNotesList.length > 0 && selectedWeek !== 4) {
+        notesHtml += `
+          <div class="mt-2.5 pt-2.5 border-t border-slate-100 space-y-1">
+            ${weeklyNotesList.map(n => `
+              <div class="flex items-start gap-2 font-medium text-slate-700 text-xs">
+                <span class="text-blue-600 font-bold">•</span>
+                <span>${n}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      notesContent.innerHTML = notesHtml;
     }
 
-    // 7. Cập nhật các khối thống kê cuối trang
+    // 8. Cập nhật các khối thống kê cuối trang
     const totalLessons = ranked.reduce((s, r) => s + r.tongTiet, 0);
     const totalTot = ranked.reduce((s, r) => s + r.tot, 0);
     const totalA = ranked.reduce((s, r) => s + r.gioA, 0);
@@ -2228,9 +2423,16 @@ class DisciplineApp {
   }
 
   handleInlineEmulationChange(weekNum, className, field, value) {
+    if (!this.isDataEntryUnlocked()) {
+      this.showToast('Bạn đang ở chế độ Chỉ xem. Vui lòng đăng nhập Admin (2806) để chỉnh sửa!', 'warning');
+      this.openPasswordModal();
+      this.renderEmulationTable();
+      return;
+    }
     const w = parseInt(weekNum, 10);
     if (this.isWeekLocked(w)) {
-      this.showToast(`Tuần ${w} đã khóa niêm phong. Không thể chỉnh sửa!`, 'error');
+      this.showToast(`Tuần ${w} đã khóa niêm phong. Hãy bấm Mở Khóa Tuần trước khi chỉnh sửa!`, 'error');
+      this.renderEmulationTable();
       return;
     }
 
@@ -2252,11 +2454,12 @@ class DisciplineApp {
   }
 
   openEditClassModal(weekNum, className) {
-    const w = parseInt(weekNum, 10);
-    if (this.isWeekLocked(w)) {
-      this.showToast(`Tuần ${w} đã khóa niêm phong!`, 'error');
-      return;
-    }
+    this.requirePassword(() => {
+      const w = parseInt(weekNum, 10);
+      if (this.isWeekLocked(w)) {
+        this.showToast(`Tuần ${w} đã khóa niêm phong!`, 'error');
+        return;
+      }
 
     const weekData = this.emulationWeeks[w] || this.createDefaultWeekData(w);
     const classData = weekData.classes[className] || {};
@@ -2277,6 +2480,7 @@ class DisciplineApp {
     document.getElementById('edit-class-bonus').value = this.getBonusPoints(w, className);
 
     document.getElementById('modal-edit-class-emulation').classList.remove('hidden');
+    });
   }
 
   saveClassModal(e) {
@@ -2357,10 +2561,19 @@ class DisciplineApp {
 
   loadBonusPoints() {
     const saved = localStorage.getItem('dshs_bonus_points');
+    let pts = {};
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { }
+      try { pts = JSON.parse(saved); } catch (e) { }
     }
-    return {};
+    if (!pts || typeof pts !== 'object') pts = {};
+    if (window.DEFAULT_BONUS_POINTS) {
+      Object.keys(window.DEFAULT_BONUS_POINTS).forEach(w => {
+        if (!pts[w] || !Array.isArray(pts[w]) || pts[w].length === 0) {
+          pts[w] = JSON.parse(JSON.stringify(window.DEFAULT_BONUS_POINTS[w]));
+        }
+      });
+    }
+    return pts;
   }
 
   saveBonusPoints() {
@@ -2381,27 +2594,31 @@ class DisciplineApp {
   }
 
   openBonusModal(weekNum = null, preselectedClass = '') {
-    const emuSelect = document.getElementById('emulation-select-week');
-    const w = weekNum !== null ? weekNum : (emuSelect ? emuSelect.value : this.currentWeek);
+    this.requirePassword(() => {
+      const emuSelect = document.getElementById('emulation-select-week');
+      const w = weekNum !== null ? weekNum : (emuSelect ? emuSelect.value : this.currentWeek);
 
-    if (this.isWeekLocked(w)) {
-      this.showToast(`Tuần ${w} đã khóa niêm phong. Không thể thêm điểm cộng!`, 'error');
-      return;
-    }
+      if (this.isWeekLocked(w)) {
+        this.showToast(`Tuần ${w} đã khóa niêm phong. Không thể thêm điểm cộng!`, 'error');
+        return;
+      }
 
-    document.getElementById('modal-bonus-week-title').textContent = `Áp dụng cho Tuần ${w} (${this.getWeekDateRange(w)})`;
-    if (preselectedClass) {
-      document.getElementById('bonus-select-class').value = preselectedClass;
-    }
+      document.getElementById('modal-bonus-week-title').textContent = `Áp dụng cho Tuần ${w} (${this.getWeekDateRange(w)})`;
+      if (preselectedClass) {
+        document.getElementById('bonus-select-class').value = preselectedClass;
+      }
 
-    this.renderBonusPointsTable(w);
-    document.getElementById('modal-bonus-points').classList.remove('hidden');
+      this.renderBonusPointsTable(w);
+      document.getElementById('modal-bonus-points').classList.remove('hidden');
+    });
   }
 
   openBonusModalForClass(className) {
-    const emuSelect = document.getElementById('emulation-select-week');
-    const w = emuSelect ? emuSelect.value : this.currentWeek;
-    this.openBonusModal(w, className);
+    this.requirePassword(() => {
+      const emuSelect = document.getElementById('emulation-select-week');
+      const w = emuSelect ? emuSelect.value : this.currentWeek;
+      this.openBonusModal(w, className);
+    });
   }
 
   renderBonusPointsTable(weekNum = null) {
@@ -2528,138 +2745,202 @@ class DisciplineApp {
     const wb = XLSX.utils.book_new();
     const ws = {};
 
+    // ==========================================
+    // STYLING DEFINITIONS (TIMES NEW ROMAN & THIN BORDERS)
+    // ==========================================
+    const FONT_NAME = 'Times New Roman';
+    const borderAll = {
+      top: { style: 'thin', color: { rgb: '000000' } },
+      bottom: { style: 'thin', color: { rgb: '000000' } },
+      left: { style: 'thin', color: { rgb: '000000' } },
+      right: { style: 'thin', color: { rgb: '000000' } }
+    };
+
+    const styleHeaderNational = {
+      font: { name: FONT_NAME, sz: 11, bold: true },
+      alignment: { vertical: 'center', horizontal: 'center' }
+    };
+    const styleTitle = {
+      font: { name: FONT_NAME, sz: 15, bold: true },
+      alignment: { vertical: 'center', horizontal: 'center' }
+    };
+    const styleSubtitle = {
+      font: { name: FONT_NAME, sz: 11, italic: true },
+      alignment: { vertical: 'center', horizontal: 'center' }
+    };
+
+    const styleColHeader = {
+      font: { name: FONT_NAME, sz: 10, bold: true },
+      fill: { fgColor: { rgb: 'F2F2F2' } },
+      border: borderAll,
+      alignment: { vertical: 'center', horizontal: 'center', wrapText: true }
+    };
+
+    const styleDataCenter = {
+      font: { name: FONT_NAME, sz: 10 },
+      border: borderAll,
+      alignment: { vertical: 'center', horizontal: 'center' }
+    };
+    const styleDataCenterBold = {
+      font: { name: FONT_NAME, sz: 10, bold: true },
+      border: borderAll,
+      alignment: { vertical: 'center', horizontal: 'center' }
+    };
+    const styleDataLeft = {
+      font: { name: FONT_NAME, sz: 10 },
+      border: borderAll,
+      alignment: { vertical: 'center', horizontal: 'left' }
+    };
+    const styleSummaryLabel = {
+      font: { name: FONT_NAME, sz: 10, bold: true },
+      border: borderAll,
+      alignment: { vertical: 'center', horizontal: 'left' }
+    };
+    const styleSummaryVal = {
+      font: { name: FONT_NAME, sz: 10, bold: true },
+      border: borderAll,
+      alignment: { vertical: 'center', horizontal: 'center' }
+    };
+    const styleNoteText = {
+      font: { name: FONT_NAME, sz: 10, italic: true },
+      alignment: { vertical: 'center', horizontal: 'left' }
+    };
+
     const encodeCell = (r, c) => XLSX.utils.encode_cell({ r, c });
-    const setCell = (r, c, val, type = 's', formula = null) => {
+    const setCell = (r, c, val, type = 's', formula = null, style = styleDataCenter) => {
       const ref = encodeCell(r, c);
       const cell = { t: type, v: val };
       if (formula) cell.f = formula;
+      if (style) cell.s = style;
       ws[ref] = cell;
     };
 
     // 1. Quốc hiệu & Tên trường (Row 1 & Row 2)
-    setCell(0, 0, 'SỞ GIÁO DỤC VÀ ĐÀO TẠO ĐĂK LĂK');
-    setCell(1, 0, 'TRƯỜNG THPT SỐ 1 LÊ HỒNG PHONG');
+    setCell(0, 0, 'SỞ GIÁO DỤC VÀ ĐÀO TẠO ĐĂK LĂK', 's', null, styleHeaderNational);
+    setCell(1, 0, 'TRƯỜNG THPT SỐ 1 LÊ HỒNG PHONG', 's', null, styleHeaderNational);
 
     // 2. Tiêu đề Tuần thi đua & Mốc ngày (Row 4 & Row 5)
-    setCell(3, 0, `TỔNG HỢP THI ĐUA TUẦN ${String(emuWeek).padStart(2, '0')}`);
-    setCell(4, 0, dateRange);
+    setCell(3, 0, `TỔNG HỢP THI ĐUA TUẦN ${String(emuWeek).padStart(2, '0')}`, 's', null, styleTitle);
+    setCell(4, 0, dateRange, 's', null, styleSubtitle);
 
-    // 3. Header bảng Row 7 (r=6) & Row 8 (r=7) - Chuẩn 21 cột
-    setCell(6, 0, 'TT');
-    setCell(6, 1, 'LỚP');
-    setCell(6, 2, 'GVCN');
-    setCell(6, 4, 'Học tập');
-    setCell(6, 12, 'Nề nếp');
-    setCell(6, 16, 'HS Vắng');
-    setCell(6, 18, 'Tổng hợp chung');
+    // 3. Header bảng Row 7 (r=6) & Row 8 (r=7) - Chuẩn 21 cột truyền thống
+    for (let c = 0; c <= 20; c++) {
+      setCell(6, c, '', 's', null, styleColHeader);
+      setCell(7, c, '', 's', null, styleColHeader);
+    }
 
-    setCell(7, 4, 'Tốt');
-    setCell(7, 5, 'A');
-    setCell(7, 6, 'B');
-    setCell(7, 7, 'C');
-    setCell(7, 8, 'D');
-    setCell(7, 9, 'Tổng\ntiết');
-    setCell(7, 10, 'Điểm\nTB');
-    setCell(7, 11, 'Vị\nthứ');
-    setCell(7, 12, "15'");
-    setCell(7, 13, 'Điểm\ntrừ');
-    setCell(7, 14, 'TB\nNN');
-    setCell(7, 15, 'Vị\nthứ');
-    setCell(7, 16, 'Tổng');
-    setCell(7, 17, 'TT');
-    setCell(7, 18, 'TB\nChung');
-    setCell(7, 19, 'Xếp\nloại');
-    setCell(7, 20, 'Vị\nthứ');
+    setCell(6, 0, 'TT', 's', null, styleColHeader);
+    setCell(6, 1, 'LỚP', 's', null, styleColHeader);
+    setCell(6, 2, 'GVCN', 's', null, styleColHeader);
+    setCell(6, 4, 'Học tập', 's', null, styleColHeader);
+    setCell(6, 12, 'Nề nếp', 's', null, styleColHeader);
+    setCell(6, 16, 'HS Vắng', 's', null, styleColHeader);
+    setCell(6, 18, 'Tổng hợp chung', 's', null, styleColHeader);
+
+    setCell(7, 4, 'Tốt', 's', null, styleColHeader);
+    setCell(7, 5, 'A', 's', null, styleColHeader);
+    setCell(7, 6, 'B', 's', null, styleColHeader);
+    setCell(7, 7, 'C', 's', null, styleColHeader);
+    setCell(7, 8, 'D', 's', null, styleColHeader);
+    setCell(7, 9, 'Tổng\ntiết', 's', null, styleColHeader);
+    setCell(7, 10, 'Điểm\nTB', 's', null, styleColHeader);
+    setCell(7, 11, 'Vị\nthứ', 's', null, styleColHeader);
+    setCell(7, 12, "15'", 's', null, styleColHeader);
+    setCell(7, 13, 'Điểm\ntrừ', 's', null, styleColHeader);
+    setCell(7, 14, 'TB\nNN', 's', null, styleColHeader);
+    setCell(7, 15, 'Vị\nthứ', 's', null, styleColHeader);
+    setCell(7, 16, 'Tổng', 's', null, styleColHeader);
+    setCell(7, 17, 'TT', 's', null, styleColHeader);
+    setCell(7, 18, 'TB\nChung', 's', null, styleColHeader);
+    setCell(7, 19, 'Xếp\nloại', 's', null, styleColHeader);
+    setCell(7, 20, 'Vị\nthứ', 's', null, styleColHeader);
 
     // 4. Dữ liệu 29 lớp (Row 9 đến Row 37, r=8 đến r=36)
     ranked.forEach((r, idx) => {
       const rowIdx = 8 + idx;
       const rowNum = rowIdx + 1;
 
-      setCell(rowIdx, 0, r.stt, 'n');
-      setCell(rowIdx, 1, r.className, 's');
+      setCell(rowIdx, 0, r.stt, 'n', null, styleDataCenter);
+      setCell(rowIdx, 1, r.className, 's', null, styleDataCenterBold);
 
       // Tách GVCN thành Họ đệm (Col C) và Tên (Col D)
       const gvcnParts = (r.gvcn || '').trim().split(' ');
       const gvcnTen = gvcnParts.length > 1 ? gvcnParts.pop() : '';
       const gvcnHo = gvcnParts.join(' ');
-      setCell(rowIdx, 2, gvcnHo, 's');
-      setCell(rowIdx, 3, gvcnTen, 's');
+      setCell(rowIdx, 2, gvcnHo, 's', null, styleDataLeft);
+      setCell(rowIdx, 3, gvcnTen, 's', null, styleDataLeft);
 
       // Giờ ABCD
-      setCell(rowIdx, 4, r.tot || '', r.tot ? 'n' : 's');
-      setCell(rowIdx, 5, r.gioA || '', r.gioA ? 'n' : 's');
-      setCell(rowIdx, 6, r.gioB || '', r.gioB ? 'n' : 's');
-      setCell(rowIdx, 7, r.gioC || '', r.gioC ? 'n' : 's');
-      setCell(rowIdx, 8, r.gioD || '', r.gioD ? 'n' : 's');
+      setCell(rowIdx, 4, r.tot || '', r.tot ? 'n' : 's', null, styleDataCenter);
+      setCell(rowIdx, 5, r.gioA || '', r.gioA ? 'n' : 's', null, styleDataCenter);
+      setCell(rowIdx, 6, r.gioB || '', r.gioB ? 'n' : 's', null, styleDataCenter);
+      setCell(rowIdx, 7, r.gioC || '', r.gioC ? 'n' : 's', null, styleDataCenter);
+      setCell(rowIdx, 8, r.gioD || '', r.gioD ? 'n' : 's', null, styleDataCenter);
 
       // Tổng tiết & Điểm TB & Vị thứ Học tập (Có công thức live)
-      setCell(rowIdx, 9, r.tongTiet, 'n', `SUM(E${rowNum}:I${rowNum})`);
-      setCell(rowIdx, 10, r.diemTbHocTap, 'n', `SUM((E${rowNum}*15)+(F${rowNum}*10)+(G${rowNum}*5)+(H${rowNum}*0)+(I${rowNum}*-5))/J${rowNum}`);
-      setCell(rowIdx, 11, r.viThuHocTap, 'n', `RANK(K${rowNum},$K$9:$K$37)`);
+      setCell(rowIdx, 9, r.tongTiet, 'n', `SUM(E${rowNum}:I${rowNum})`, styleDataCenterBold);
+      setCell(rowIdx, 10, r.diemTbHocTap, 'n', `SUM((E${rowNum}*15)+(F${rowNum}*10)+(G${rowNum}*5)+(H${rowNum}*0)+(I${rowNum}*-5))/J${rowNum}`, styleDataCenterBold);
+      setCell(rowIdx, 11, r.viThuHocTap, 'n', `RANK(K${rowNum},$K$9:$K$37)`, styleDataCenterBold);
 
       // Nề nếp (15', Điểm trừ, TB NN, Vị thứ NN)
-      setCell(rowIdx, 12, r.diem15, 'n');
-      setCell(rowIdx, 13, r.diemTru, 'n');
-      setCell(rowIdx, 14, r.tbNenNep, 'n', `M${rowNum}-N${rowNum}`);
-      setCell(rowIdx, 15, r.viThuNenNep, 'n', `RANK(O${rowNum},$O$9:$O$37)`);
+      setCell(rowIdx, 12, r.diem15, 'n', null, styleDataCenter);
+      setCell(rowIdx, 13, r.diemTru, 'n', null, styleDataCenterBold);
+      setCell(rowIdx, 14, r.tbNenNep, 'n', `M${rowNum}-N${rowNum}`, styleDataCenterBold);
+      setCell(rowIdx, 15, r.viThuNenNep, 'n', `RANK(O${rowNum},$O$9:$O$37)`, styleDataCenterBold);
 
       // HS Vắng
-      setCell(rowIdx, 16, r.hsVang || '', r.hsVang ? 'n' : 's');
-      setCell(rowIdx, 17, r.viThuVang, 'n', `RANK(Q${rowNum},$Q$9:$Q$37,1)`);
+      setCell(rowIdx, 16, r.hsVang || '', r.hsVang ? 'n' : 's', null, styleDataCenter);
+      setCell(rowIdx, 17, r.viThuVang, 'n', `RANK(Q${rowNum},$Q$9:$Q$37,1)`, styleDataCenter);
 
       // TB Chung, Xếp loại, Vị thứ Chung cuộc
       const bonusPts = r.bonus || 0;
       const tbChungFormula = bonusPts > 0 ? `(K${rowNum}+O${rowNum})/2+${bonusPts}` : `(K${rowNum}+O${rowNum})/2`;
-      setCell(rowIdx, 18, r.tbChung, 'n', tbChungFormula);
+      setCell(rowIdx, 18, r.tbChung, 'n', tbChungFormula, styleDataCenterBold);
       const xepLoaiFormula = `IF(S${rowNum}>=10,"X sắc",IF(AND(S${rowNum}>=9,S${rowNum}<10),"Giỏi",IF(AND(S${rowNum}>=7.5,S${rowNum}<9),"Khá",IF(AND(S${rowNum}>=6.5,S${rowNum}<7.5),"T.bình",IF(AND(S${rowNum}>=5,S${rowNum}<6.5),"Yếu","Kém")))))`;
-      setCell(rowIdx, 19, r.xepLoai, 's', xepLoaiFormula);
-      setCell(rowIdx, 20, r.viThuChung, 'n', `RANK(S${rowNum},$S$9:$S$37)`);
+      setCell(rowIdx, 19, r.xepLoai, 's', xepLoaiFormula, styleDataCenterBold);
+      setCell(rowIdx, 20, r.viThuChung, 'n', `RANK(S${rowNum},$S$9:$S$37)`, styleDataCenterBold);
     });
 
     // 5. Hàng Tổng giờ dạy học tập (Row 38, r=37)
-    setCell(37, 4, ranked.reduce((s, r) => s + r.tot, 0), 'n', 'SUM(E9:E37)');
-    setCell(37, 5, ranked.reduce((s, r) => s + r.gioA, 0), 'n', 'SUM(F9:F37)');
-    setCell(37, 6, ranked.reduce((s, r) => s + r.gioB, 0), 'n', 'SUM(G9:G37)');
-    setCell(37, 7, ranked.reduce((s, r) => s + r.gioC, 0), 'n', 'SUM(H9:H37)');
-    setCell(37, 8, ranked.reduce((s, r) => s + r.gioD, 0), 'n', 'SUM(I9:I37)');
-    setCell(37, 9, ranked.reduce((s, r) => s + r.tongTiet, 0), 'n', 'SUM(J9:J37)');
+    for (let c = 0; c <= 20; c++) {
+      setCell(37, c, '', 's', null, styleDataCenterBold);
+    }
+    setCell(37, 4, ranked.reduce((s, r) => s + r.tot, 0), 'n', 'SUM(E9:E37)', styleDataCenterBold);
+    setCell(37, 5, ranked.reduce((s, r) => s + r.gioA, 0), 'n', 'SUM(F9:F37)', styleDataCenterBold);
+    setCell(37, 6, ranked.reduce((s, r) => s + r.gioB, 0), 'n', 'SUM(G9:G37)', styleDataCenterBold);
+    setCell(37, 7, ranked.reduce((s, r) => s + r.gioC, 0), 'n', 'SUM(H9:H37)', styleDataCenterBold);
+    setCell(37, 8, ranked.reduce((s, r) => s + r.gioD, 0), 'n', 'SUM(I9:I37)', styleDataCenterBold);
+    setCell(37, 9, ranked.reduce((s, r) => s + r.tongTiet, 0), 'n', 'SUM(J9:J37)', styleDataCenterBold);
 
     // 6. Khối Tổng Hợp Chung & Ghi Chú Dưới Bảng (Row 39 to 47, r=38 to 46)
-    setCell(38, 0, 'TỔNG HỢP CHUNG', 's');
+    setCell(38, 0, 'TỔNG HỢP CHUNG', 's', null, styleSummaryLabel);
+    for (let c = 1; c <= 3; c++) setCell(38, c, '', 's', null, styleSummaryLabel);
 
-    setCell(39, 0, 'TT', 's');
-    setCell(39, 1, 'Nội dung', 's');
-    setCell(39, 5, 'T. số', 's');
-    setCell(39, 8, 'Ghi chú:', 's');
+    setCell(39, 0, 'TT', 's', null, styleColHeader);
+    setCell(39, 1, 'Nội dung', 's', null, styleColHeader);
+    for (let c = 2; c <= 4; c++) setCell(39, c, '', 's', null, styleColHeader);
+    setCell(39, 5, 'T. số', 's', null, styleColHeader);
+    setCell(39, 6, '', 's', null, styleColHeader);
+    setCell(39, 8, 'Ghi chú:', 's', null, styleSummaryLabel);
 
-    setCell(40, 0, 1, 'n');
-    setCell(40, 1, 'Tổng học sinh vắng', 's');
-    setCell(40, 5, ranked.reduce((s, r) => s + r.hsVang, 0), 'n', 'SUM(Q9:Q37)');
+    const summaryRows = [
+      { tt: 1, name: 'Tổng học sinh vắng', val: ranked.reduce((s, r) => s + r.hsVang, 0), f: 'SUM(Q9:Q37)' },
+      { tt: 2, name: 'Lớp xếp loại Xuất sắc', val: ranked.filter(r => r.xepLoai === 'X sắc').length, f: 'COUNTIF(T9:T37,"X sắc")' },
+      { tt: 3, name: 'Lớp xếp loại Giỏi', val: ranked.filter(r => r.xepLoai === 'Giỏi').length, f: 'COUNTIF(T9:T37,"Giỏi")' },
+      { tt: 4, name: 'Lớp xếp loại Khá', val: ranked.filter(r => r.xepLoai === 'Khá').length, f: 'COUNTIF(T9:T37,"Khá")' },
+      { tt: 5, name: 'Lớp xếp loại Trung bình', val: ranked.filter(r => r.xepLoai === 'T.bình').length, f: 'COUNTIF(T9:T37,"T.bình")' },
+      { tt: 6, name: 'Lớp xếp loại Yếu', val: ranked.filter(r => r.xepLoai === 'Yếu').length, f: 'COUNTIF(T9:T37,"Yếu")' },
+      { tt: 7, name: 'Lớp xếp loại Kém', val: ranked.filter(r => r.xepLoai === 'Kém').length, f: 'COUNTIF(T9:T37,"Kém")' }
+    ];
 
-    setCell(41, 0, 2, 'n');
-    setCell(41, 1, 'Lớp xếp loại Xuất sắc', 's');
-    setCell(41, 5, ranked.filter(r => r.xepLoai === 'X sắc').length, 'n', 'COUNTIF(T9:T37,"X sắc")');
-
-    setCell(42, 0, 3, 'n');
-    setCell(42, 1, 'Lớp xếp loại Giỏi', 's');
-    setCell(42, 5, ranked.filter(r => r.xepLoai === 'Giỏi').length, 'n', 'COUNTIF(T9:T37,"Giỏi")');
-
-    setCell(43, 0, 4, 'n');
-    setCell(43, 1, 'Lớp xếp loại Khá', 's');
-    setCell(43, 5, ranked.filter(r => r.xepLoai === 'Khá').length, 'n', 'COUNTIF(T9:T37,"Khá")');
-
-    setCell(44, 0, 5, 'n');
-    setCell(44, 1, 'Lớp xếp loại Trung bình', 's');
-    setCell(44, 5, ranked.filter(r => r.xepLoai === 'T.bình').length, 'n', 'COUNTIF(T9:T37,"T.bình")');
-
-    setCell(45, 0, 6, 'n');
-    setCell(45, 1, 'Lớp xếp loại Yếu', 's');
-    setCell(45, 5, ranked.filter(r => r.xepLoai === 'Yếu').length, 'n', 'COUNTIF(T9:T37,"Yếu")');
-
-    setCell(46, 0, 7, 'n');
-    setCell(46, 1, 'Lớp xếp loại Kém', 's');
-    setCell(46, 5, ranked.filter(r => r.xepLoai === 'Kém').length, 'n', 'COUNTIF(T9:T37,"Kém")');
+    summaryRows.forEach((row, i) => {
+      const rIdx = 40 + i;
+      setCell(rIdx, 0, row.tt, 'n', null, styleDataCenter);
+      setCell(rIdx, 1, row.name, 's', null, styleSummaryLabel);
+      for (let c = 2; c <= 4; c++) setCell(rIdx, c, '', 's', null, styleSummaryLabel);
+      setCell(rIdx, 5, row.val, 'n', row.f, styleSummaryVal);
+      setCell(rIdx, 6, '', 's', null, styleSummaryVal);
+    });
 
     // Điền rõ ràng từng dòng Ghi chú điểm cộng vào Cột I (r=40 đến r=50)
     if (bonusList && bonusList.length > 0) {
@@ -2667,11 +2948,11 @@ class DisciplineApp {
         const noteRow = 40 + idx;
         if (noteRow <= 50) {
           const noteText = `Lớp ${b.className} cộng ${b.points}đ, lý do: ${b.reason || 'thực hiện công trình tự giác'}`;
-          setCell(noteRow, 8, noteText, 's');
+          setCell(noteRow, 8, noteText, 's', null, styleNoteText);
         }
       });
     } else {
-      setCell(40, 8, 'Tuần này không có điểm cộng.', 's');
+      setCell(40, 8, 'Tuần này không có điểm cộng.', 's', null, styleNoteText);
     }
 
     // 7. Thiết lập vùng Merges đúng 100% theo file gốc
@@ -3805,6 +4086,9 @@ class DisciplineApp {
       }
     }
 
+    // Cập nhật lại Bảng Thi Đua để chuyển trạng thái giữa Chỉ xem (plain text) và Sửa (input)
+    this.renderEmulationTable();
+
     if (window.lucide) window.lucide.createIcons();
   }
 
@@ -3867,14 +4151,18 @@ class DisciplineApp {
       try {
         sessionStorage.setItem('data_entry_unlocked', 'true');
         
-        // 1. Tự động đóng (ẩn) hộp thoại đăng nhập ngay lập tức không độ trễ
+        // 1. Mở khóa toàn bộ các tuần (Tuần 1 đến 6) theo đặc quyền Admin 2806
+        this.lockedWeeks = [];
+        this.saveLockedWeeks();
+
+        // 2. Tự động đóng hộp thoại đăng nhập ngay lập tức
         this.closePasswordModal();
 
-        // 2. Cập nhật giao diện mở khóa
+        // 3. Cập nhật giao diện mở khóa
         this.updateLockStatusUI();
         
-        // 3. Hiển thị thông báo "Đăng nhập thành công"
-        this.showToast('Đăng nhập thành công!', 'success');
+        // 4. Hiển thị thông báo thành công
+        this.showToast('Quyền Admin (2806): Đăng nhập thành công! Đã cấp quyền và mở khóa toàn bộ các tuần (Tuần 1 - 6) để chỉnh sửa.', 'success');
 
         if (typeof this.pendingAction === 'function') {
           const action = this.pendingAction;

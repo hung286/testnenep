@@ -12852,3 +12852,22 @@ window.DEFAULT_LOCKED_WEEKS = {
     }
   }
 };
+
+window.DEFAULT_BONUS_POINTS = {
+  "4": [
+    {
+      "id": "bonus_w4_11a03",
+      "className": "11A03",
+      "points": 1.0,
+      "reason": "thực hiện công trình tự giác"
+    }
+  ]
+};
+
+window.DEFAULT_WEEKLY_NOTES = {
+  "4": [
+    "Thống kê xếp loại Tuần 4: 6 lớp Xuất sắc, 20 lớp Giỏi, 1 lớp Khá, 1 lớp Trung bình. Tổng học sinh vắng toàn trường: 163 lượt.",
+    "Lớp 11A03 cộng 1đ, lý do: thực hiện công trình tự giác."
+  ]
+};
+
