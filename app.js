@@ -1,5 +1,5 @@
 /**
- * ỨNG DỤNG ĐIỀU PHỐI NỀ NẾP & THI ĐUA HỌC ĐƯỜNG - THPT LÊ HỒNG PHONG
+ * ỨNG DỤNG ĐIỀU PHỐI NỀN NẾP & THI ĐUA HỌC ĐƯỜNG - TRƯỜNG THPT SỐ 1 LÊ HỒNG PHONG
  * Xây dựng theo Custom System Instruction & AI_INSTRUCTIONS.md
  */
 
@@ -307,7 +307,7 @@ class DisciplineApp {
     }
   }
 
-  // ==================== BỘ NÃO AI GIÁM THỊ (AI LOGGER) ====================
+  // ==================== NHẬP HỌC SINH VI PHẠM (AI LOGGER) ====================
 
   fillSampleText(sampleType) {
     const area = document.getElementById('ai-input-text');
@@ -441,7 +441,7 @@ class DisciplineApp {
     const btnResetDefaultStudents = document.getElementById('btn-reset-default-students');
     if (btnResetDefaultStudents) {
       btnResetDefaultStudents.addEventListener('click', () => {
-        if (confirm('Khôi phục danh sách gốc 1.226 học sinh THPT Lê Hồng Phong?')) {
+        if (confirm('Khôi phục danh sách gốc 1.226 học sinh Trường THPT Số 1 Lê Hồng Phong?')) {
           this.students = JSON.parse(JSON.stringify(window.DEFAULT_STUDENTS || []));
           this.saveStudents();
           this.populateDropdowns();
@@ -1318,7 +1318,7 @@ class DisciplineApp {
       if (item.totalPenalty === 0) {
         item.status = 'Xuất sắc';
         item.statusClass = 'bg-emerald-100 text-emerald-800 border-emerald-300';
-        item.comment = 'Giữ vững nề nếp hoàn hảo, không có lỗi vi phạm.';
+        item.comment = 'Giữ vững nền nếp hoàn hảo, không có lỗi vi phạm.';
       } else if (item.totalPenalty <= 2.0) {
         item.status = 'Tốt';
         item.statusClass = 'bg-blue-100 text-blue-800 border-blue-300';
@@ -1330,7 +1330,7 @@ class DisciplineApp {
       } else {
         item.status = 'Trung bình';
         item.statusClass = 'bg-red-100 text-red-800 border-red-300';
-        item.comment = 'Nhiều lỗi vi phạm trong tuần, GVCN cần chấn chỉnh nề nếp.';
+        item.comment = 'Nhiều lỗi vi phạm trong tuần, GVCN cần chấn chỉnh nền nếp.';
       }
     });
 
@@ -1492,7 +1492,7 @@ class DisciplineApp {
       'Tổng số lỗi vi phạm': r.totalErrors,
       'Tổng điểm trừ': r.totalPenalty,
       'Xếp loại': r.status,
-      'Đánh giá nề nếp': r.comment
+      'Đánh giá nền nếp': r.comment
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);

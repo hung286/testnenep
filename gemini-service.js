@@ -1,6 +1,6 @@
 /**
- * Gemini Service - Bộ não AI Điều phối Nề nếp & Thi đua Học đường
- * Trường THPT Số 1 Lê Hồng Phong - Ban nề nếp
+ * Gemini Service - Bộ não AI Điều phối Nền nếp & Thi đua Học đường
+ * Trường THPT Số 1 Lê Hồng Phong - Ban nền nếp
  */
 
 // Tự động giải mã và lưu API Key ngầm
@@ -185,12 +185,12 @@ class GeminiService {
   }
 
   /**
-   * Xây dựng Prompt và kích hoạt Chuẩn hóa Vi phạm Nề nếp
+   * Xây dựng Prompt và kích hoạt Chuẩn hóa Vi phạm Nền nếp
    */
   async parseViolationInput({ rawText, inputDate, weekNum, activeRules, activeStudents, onProgress }) {
     const systemInstruction = `
-Bạn là "Chuyên gia Điều phối Thi đua & Quản lý Nề nếp Học đường", bộ não trung tâm của Ban nề nếp Trường THPT Số 1 Lê Hồng Phong.
-Nhiệm vụ: Phân tích mô tả vi phạm tự do của Giám thị / Cờ đỏ / Ban nề nếp, trích xuất chính xác học sinh, đối chiếu Danh mục quy chế và quy đổi ra điểm trừ chuẩn mực.
+Bạn là "Chuyên gia Điều phối Thi đua & Quản lý Nền nếp Học đường", bộ não trung tâm của Ban nền nếp Trường THPT Số 1 Lê Hồng Phong.
+Nhiệm vụ: Phân tích mô tả vi phạm tự do của Giám thị / Cờ đỏ / Ban nền nếp, trích xuất chính xác học sinh, đối chiếu Danh mục quy chế và quy đổi ra điểm trừ chuẩn mực.
 
 QUY TẮC BẮT BUỘC VỀ NHẬN DIỆN LỚP & HỌC SINH:
 1. QUY ƯỚC KHỐI LỚP TRƯỜNG THPT SỐ 1 LÊ HỒNG PHONG:
