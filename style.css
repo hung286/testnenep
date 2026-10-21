@@ -249,3 +249,82 @@ body {
     font-size: 0.9rem;
   }
 }
+
+/* ========================================================= */
+/* BẢNG TỔNG HỢP THI ĐUA CHUẨN MỰC & NHẬP LIỆU TUẦN          */
+/* ========================================================= */
+.table-num-input {
+  width: 48px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 4px 2px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #0f172a;
+  transition: all 0.15s ease;
+}
+
+.table-num-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px #bfdbfe;
+  background-color: #eff6ff;
+}
+
+.table-num-input:disabled {
+  background-color: #f8fafc;
+  border-color: transparent;
+  color: #475569;
+  cursor: default;
+}
+
+/* Header nhóm cột bảng thi đua */
+.th-group-study {
+  background-color: #e0e7ff !important;
+  color: #3730a3 !important;
+  border-bottom: 2px solid #c7d2fe !important;
+}
+
+.th-group-discipline {
+  background-color: #ffe4e6 !important;
+  color: #9f1239 !important;
+  border-bottom: 2px solid #fecdd3 !important;
+}
+
+.th-group-absence {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-bottom: 2px solid #e2e8f0 !important;
+}
+
+.th-group-bonus {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border-bottom: 2px solid #fde68a !important;
+}
+
+.th-group-overall {
+  background-color: #d1fae5 !important;
+  color: #065f46 !important;
+  border-bottom: 2px solid #a7f3d0 !important;
+}
+
+/* Bảng thi đua cố định cột */
+.emulation-table th, .emulation-table td {
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* Snapshot timeline card */
+.snapshot-item {
+  border-left: 3px solid #3b82f6;
+  transition: all 0.2s ease;
+}
+
+.snapshot-item:hover {
+  background-color: #f8fafc;
+  border-left-color: #1d4ed8;
+}
