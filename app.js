@@ -2012,7 +2012,7 @@ class DisciplineApp {
     }
 
     this.requirePassword(() => {
-      const confirmMsg = `Bạn có chắc chắn muốn xóa bản ghi vi phạm của học sinh "${studentName}" (Lớp ${targetClass}, Tuần ${targetWeek})?\n\nHệ thống sẽ tự động tính toán lại điểm trừ nề nếp, TB Chung, Xếp loại và Vị thứ của Lớp ${targetClass} ngay lập tức!`;
+      const confirmMsg = `Bạn có chắc chắn muốn xóa bản ghi vi phạm của học sinh "${studentName}" (Lớp ${targetClass}, Tuần ${targetWeek})?\n\nHệ thống sẽ tự động tính toán lại điểm trừ nền nếp, TB Chung, Xếp loại và Vị thứ của Lớp ${targetClass} ngay lập tức!`;
       if (!confirm(confirmMsg)) return;
 
       // 1. Ghi nhận ID đã xóa để chống khôi phục ngoài ý muốn
@@ -2292,7 +2292,7 @@ class DisciplineApp {
         diemTbHocTap = ((tot * 15) + (gioA * 10) + (gioB * 5) + (gioC * 0) + (gioD * -5)) / tongTiet;
       }
 
-      // 2. Điểm trừ nề nếp:
+      // 2. Điểm trừ nền nếp:
       // Tự động liên kết và tính toán trực tiếp từ dữ liệu học sinh vi phạm ghi nhận trên hệ thống web
       let diemTru = 0.0;
       const violationDetails = this.violations.filter(v => parseInt(v.week, 10) === w && v.class_name === cName);
@@ -2315,10 +2315,10 @@ class DisciplineApp {
         }
       }
 
-      // 3. Điểm TB Nề nếp = 15' - Điểm trừ
+      // 3. Điểm TB Nền nếp = 15' - Điểm trừ
       const tbNenNep = diem15 - diemTru;
 
-      // 4. Điểm TB Chung = ((Điểm TB học tập + TB nề nếp) / 2) + Điểm cộng vào TB
+      // 4. Điểm TB Chung = ((Điểm TB học tập + TB nền nếp) / 2) + Điểm cộng vào TB
       const tbChung = ((diemTbHocTap + tbNenNep) / 2) + bonus;
 
       // 5. Xếp loại theo cấu trúc chuẩn công thức Excel mẫu nhà trường:
@@ -2384,7 +2384,7 @@ class DisciplineApp {
       }
     }
 
-    // B. Vị thứ nề nếp
+    // B. Vị thứ nền nếp
     const sortedNN = [...results].sort((a, b) => b.tbNenNep - a.tbNenNep);
     for (let i = 0; i < sortedNN.length; i++) {
       const match = results.find(x => x.className === sortedNN[i].className);
@@ -3377,7 +3377,7 @@ class DisciplineApp {
     setCell(6, 1, 'LỚP', 's', null, styleColHeader);
     setCell(6, 2, 'GVCN', 's', null, styleColHeader);
     setCell(6, 4, 'Học tập', 's', null, styleColHeader);
-    setCell(6, 12, 'Nề nếp', 's', null, styleColHeader);
+    setCell(6, 12, 'Nền nếp', 's', null, styleColHeader);
     setCell(6, 16, 'HS Vắng', 's', null, styleColHeader);
     setCell(6, 18, 'Tổng hợp chung', 's', null, styleColHeader);
 
@@ -3444,7 +3444,7 @@ class DisciplineApp {
       setCell(rowIdx, 10, valTbHocTap, 'n', tbHocTapFormula, styleDataCenterBold, '0.000');
       setCell(rowIdx, 11, Number(r.viThuHocTap) || 1, 'n', `RANK(K${rowNum},$K$9:$K$37)`, styleDataCenterBold, '0');
 
-      // Nề nếp (15', Điểm trừ, TB NN, Vị thứ NN)
+      // Nền nếp (15', Điểm trừ, TB NN, Vị thứ NN)
       setCell(rowIdx, 12, valDiem15, 'n', null, styleDataCenter, '0.0');
       setCell(rowIdx, 13, valDiemTru, 'n', null, styleDataCenterBold, '0.0');
       setCell(rowIdx, 14, valTbNn, 'n', `N(M${rowNum})-N(N${rowNum})`, styleDataCenterBold, '0.00');
@@ -3533,7 +3533,7 @@ class DisciplineApp {
       { s: { r: 6, c: 1 }, e: { r: 7, c: 1 } },   // LỚP
       { s: { r: 6, c: 2 }, e: { r: 7, c: 3 } },   // GVCN
       { s: { r: 6, c: 4 }, e: { r: 6, c: 11 } },  // Học tập
-      { s: { r: 6, c: 12 }, e: { r: 6, c: 15 } }, // Nề nếp
+      { s: { r: 6, c: 12 }, e: { r: 6, c: 15 } }, // Nền nếp
       { s: { r: 6, c: 16 }, e: { r: 6, c: 17 } }, // HS Vắng
       { s: { r: 6, c: 18 }, e: { r: 6, c: 20 } }, // Tổng hợp chung
       { s: { r: 38, c: 0 }, e: { r: 38, c: 3 } }, // TỔNG HỢP CHUNG
@@ -3761,7 +3761,7 @@ class DisciplineApp {
     const emuWeek = emuSelect ? emuSelect.value : this.currentWeek;
     const ranked = this.calculateWeeklyEmulationRankings(emuWeek);
 
-    let md = `| Hạng | Lớp | GVCN | SHL | TB Học Tập | TB Nề Nếp | Điểm Trừ | Điểm Cộng | TB Chung | Xếp Loại |
+    let md = `| Hạng | Lớp | GVCN | SHL | TB Học Tập | TB Nền Nếp | Điểm Trừ | Điểm Cộng | TB Chung | Xếp Loại |
 `;
     md += `|:---:|:---:|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 `;
@@ -4969,7 +4969,7 @@ class DisciplineApp {
         if (isAdminPass) {
           this.showToast('🔓 Quyền Admin: Đăng nhập thành công! Đã cấp quyền quản trị cấp cao và mở khóa toàn bộ các tuần.', 'success');
         } else {
-          this.showToast('🚩 Quyền Giám Thị / Cờ Đỏ: Đăng nhập thành công! Thầy/cô và ban nề nếp có thể ghi nhận vi phạm.', 'success');
+          this.showToast('🚩 Quyền Giám Thị / Cờ Đỏ: Đăng nhập thành công! Thầy/cô và ban nền nếp có thể ghi nhận vi phạm.', 'success');
         }
 
         if (typeof this.pendingAction === 'function') {

@@ -151,6 +151,11 @@
           <span id="lock-badge-tab-backup" class="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">🔒 Admin</span>
         </button>
 
+        <button data-tab="tab-backup" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+          <span>Sao Lưu & Bảo Vệ Dữ Liệu</span>
+        </button>
+
       </div>
     </div>
   </nav>
@@ -611,7 +616,7 @@
             </p>
             <p class="mt-1 leading-relaxed text-[11px] text-slate-300">
               • <strong>Tuần 01 -> 06:</strong> Đã kết thúc và được khóa dữ liệu niêm phong.<br>
-              • <strong>Từ Tuần 07 trở đi:</strong> Tuần hiện tại mở để nhập liệu/chỉnh sửa. <strong>Điểm trừ nề nếp</strong> được tự động tính trực tiếp từ học sinh vi phạm ghi nhận trên hệ thống.
+              • <strong>Từ Tuần 07 trở đi:</strong> Tuần hiện tại mở để nhập liệu/chỉnh sửa. <strong>Điểm trừ nền nếp</strong> được tự động tính trực tiếp từ học sinh vi phạm ghi nhận trên hệ thống.
             </p>
           </div>
         </div>
@@ -626,7 +631,7 @@
             </div>
             <div>
               <h3 class="font-extrabold text-slate-900 text-sm" id="emulation-table-title">BẢNG TỔNG HỢP THI ĐUA 29 LỚP</h3>
-              <p class="text-[11px] text-slate-500">Bảo toàn đầy đủ công thức chuẩn: Điểm TB học tập, TB nề nếp, Tổng hợp chung, Xếp loại và Vị thứ</p>
+              <p class="text-[11px] text-slate-500">Bảo toàn đầy đủ công thức chuẩn: Điểm TB học tập, TB nền nếp, Tổng hợp chung, Xếp loại và Vị thứ</p>
             </div>
           </div>
 
@@ -660,9 +665,9 @@
                 <th colspan="7" class="text-center th-group-study border border-indigo-200">HỌC TẬP (GIỜ ABCD)</th>
                 <th rowspan="2" class="text-center w-14 th-group-study border border-indigo-200 font-bold" title="Vị thứ học tập">Vị thứ</th>
                 
-                <!-- Nhóm Nề Nếp (3 cột) -->
-                <th colspan="3" class="text-center th-group-discipline border border-rose-200">NỀ NẾP</th>
-                <th rowspan="2" class="text-center w-14 th-group-discipline border border-rose-200 font-bold" title="Vị thứ nề nếp">Vị thứ</th>
+                <!-- Nhóm Nền Nếp (3 cột) -->
+                <th colspan="3" class="text-center th-group-discipline border border-rose-200">NỀN NẾP</th>
+                <th rowspan="2" class="text-center w-14 th-group-discipline border border-rose-200 font-bold" title="Vị thứ nền nếp">Vị thứ</th>
                 
                 <!-- Nhóm Vắng (2 cột) -->
                 <th colspan="2" class="text-center th-group-absence border border-slate-200">HS VẮNG</th>
@@ -685,17 +690,17 @@
                 <th class="text-center w-14 bg-indigo-100 text-indigo-950 font-bold border border-indigo-200 text-[11px]">Tổng tiết</th>
                 <th class="text-center w-16 bg-indigo-100 text-indigo-950 font-bold border border-indigo-200 text-[11px]" title="Điểm TB = (Tốt*15 + A*10 + B*5 + C*0 + D*-5) / Tổng tiết">Điểm TB</th>
 
-                <!-- Nề nếp -->
-                <th class="text-center w-14 bg-rose-50 text-rose-900 border border-rose-200 text-[11px]" title="Điểm nề nếp 15 phút (Khởi điểm 10đ)">15'</th>
+                <!-- Nền nếp -->
+                <th class="text-center w-14 bg-rose-50 text-rose-900 border border-rose-200 text-[11px]" title="Điểm nền nếp 15 phút (Khởi điểm 10đ)">15'</th>
                 <th class="text-center w-16 bg-rose-50 text-rose-900 font-bold border border-rose-200 text-[11px]" title="Điểm trừ tự động liên kết từ học sinh vi phạm">Điểm trừ</th>
-                <th class="text-center w-16 bg-rose-100 text-rose-950 font-bold border border-rose-200 text-[11px]" title="TB Nề nếp = 15' - Điểm trừ">TB NN</th>
+                <th class="text-center w-16 bg-rose-100 text-rose-950 font-bold border border-rose-200 text-[11px]" title="TB Nền nếp = 15' - Điểm trừ">TB NN</th>
 
                 <!-- Vắng -->
                 <th class="text-center w-12 bg-slate-100 text-slate-800 border border-slate-200 text-[11px]">Tổng</th>
                 <th class="text-center w-12 bg-slate-100 text-slate-800 border border-slate-200 text-[11px]">Vị thứ</th>
 
                 <!-- Tổng hợp chung -->
-                <th class="text-center w-20 bg-emerald-100 text-emerald-950 font-extrabold border border-emerald-200 text-[11px]" title="TB Chung = (Điểm TB học tập + TB nề nếp)/2 + Điểm cộng">TB Chung</th>
+                <th class="text-center w-20 bg-emerald-100 text-emerald-950 font-extrabold border border-emerald-200 text-[11px]" title="TB Chung = (Điểm TB học tập + TB nền nếp)/2 + Điểm cộng">TB Chung</th>
                 <th class="text-center w-20 bg-emerald-100 text-emerald-950 font-extrabold border border-emerald-200 text-[11px]">Xếp loại</th>
                 <th class="text-center w-14 bg-emerald-100 text-emerald-950 font-extrabold border border-emerald-200 text-[11px]">Vị thứ</th>
               </tr>
@@ -979,7 +984,7 @@
               Sao Lưu Dự Phòng & Bảo Vệ CSDL 1 Năm Học
             </h2>
             <p class="text-xs md:text-sm text-emerald-100 font-normal leading-relaxed max-w-2xl">
-              Đảm bảo toàn vẹn dữ liệu nề nếp thi đua suốt 35+ tuần học. Chống mọi nguy cơ mất mát, tự động xóa hoặc thay đổi ngoài ý muốn khi dùng trình duyệt hoặc máy chủ nội bộ.
+              Đảm bảo toàn vẹn dữ liệu nền nếp thi đua suốt 35+ tuần học. Chống mọi nguy cơ mất mát, tự động xóa hoặc thay đổi ngoài ý muốn khi dùng trình duyệt hoặc máy chủ nội bộ.
             </p>
           </div>
 
@@ -1491,7 +1496,7 @@
         <i data-lucide="lock" class="w-7 h-7"></i>
       </div>
       <h3 id="login-password-modal-title" class="text-lg md:text-xl font-bold text-slate-900">Đăng Nhập Ban Nền Nếp & Quản Trị</h3>
-      <p id="login-password-modal-subtitle" class="text-xs md:text-sm text-slate-500 mt-1 mb-5">Nhập mật khẩu Admin (Quản trị toàn quyền) hoặc Giám thị / Cờ đỏ (Nhập nề nếp)</p>
+      <p id="login-password-modal-subtitle" class="text-xs md:text-sm text-slate-500 mt-1 mb-5">Nhập mật khẩu Admin (Quản trị toàn quyền) hoặc Giám thị / Cờ đỏ (Nhập nền nếp)</p>
 
       <form id="form-login-password" autocomplete="off" onsubmit="event.preventDefault(); window.app && window.app.submitPassword(); return false;">
         <!-- Hidden decoy inputs to neutralize browser password save prompts -->
@@ -1908,7 +1913,7 @@
           </div>
           <div>
             <h3 class="text-base font-bold text-slate-900" id="modal-edit-class-title">Chỉnh Sửa Dữ Liệu Lớp</h3>
-            <p class="text-xs text-slate-500" id="modal-edit-class-subtitle">Cập nhật giờ ABCD, SHL, nề nếp</p>
+            <p class="text-xs text-slate-500" id="modal-edit-class-subtitle">Cập nhật giờ ABCD, SHL, nền nếp</p>
           </div>
         </div>
         <button id="btn-close-edit-class-modal" class="text-slate-400 hover:text-slate-700 cursor-pointer">
@@ -1927,7 +1932,7 @@
                    class="w-full font-bold p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
           </div>
           <div>
-            <label class="block font-bold text-slate-700 uppercase mb-1">Điểm 15' (Nề nếp):</label>
+            <label class="block font-bold text-slate-700 uppercase mb-1">Điểm 15' (Nền nếp):</label>
             <input type="number" id="edit-class-diem15" step="0.1" min="0" max="10"
                    class="w-full font-bold p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
           </div>
