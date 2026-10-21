@@ -209,24 +209,85 @@ class DisciplineApp {
     return sorted;
   }
 
-  saveViolations() {
-    localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+  saveViolations(targetWeek = null, targetClassName = null) {
+    try {
+      localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+    } catch (e) {}
     this.updateBadges();
 
-    // Tự động tính toán lại điểm trừ thi đua của tuần hiện tại (Tuần 7)
-    const curW = this.calculateWeek(new Date());
-    if (this.emulationWeeks && this.emulationWeeks[curW]) {
-      this.calculateWeeklyEmulationRankings(curW);
-      this.saveEmulationWeeks(true);
+    // 1. Tự động đồng bộ và tính toán lại điểm trừ cho tuần tương ứng
+    if (targetWeek) {
+      this.syncViolationWithEmulation(targetWeek, targetClassName);
+    } else {
+      const curW = this.calculateWeek(new Date());
+      if (this.emulationWeeks && this.emulationWeeks[curW]) {
+        this.syncViolationWithEmulation(curW, targetClassName);
+      }
     }
-    
-    // Cập nhật lại giao diện bảng thi đua nếu đang hiển thị
+
+    // 2. Cập nhật lại giao diện Bảng thi đua nếu đang hiển thị
     const emuSelect = document.getElementById('emulation-select-week');
     if (emuSelect && emuSelect.value) {
       this.renderEmulationTable();
     }
 
     this.pushToCloud(true);
+  }
+
+  syncViolationWithEmulation(weekNum, className = null) {
+    const w = parseInt(weekNum, 10);
+    if (isNaN(w)) return;
+
+    if (!this.emulationWeeks) this.emulationWeeks = {};
+    if (!this.emulationWeeks[w]) {
+      this.emulationWeeks[w] = this.createDefaultWeekData(w);
+    }
+    if (!this.emulationWeeks[w].classes) {
+      this.emulationWeeks[w].classes = {};
+    }
+
+    const classesToSync = className ? [className] : (window.DEFAULT_CLASSES || []).map(c => c.class);
+
+    classesToSync.forEach(cName => {
+      if (!this.emulationWeeks[w].classes[cName]) {
+        this.emulationWeeks[w].classes[cName] = {
+          stt: 1,
+          className: cName,
+          tot: 0,
+          gioA: 27,
+          gioB: 0,
+          gioC: 0,
+          gioD: 0,
+          tongTiet: 27,
+          diemTbHocTap: 10.0,
+          diem15: 10.0,
+          diemTru: 0.0,
+          tbNenNep: 10.0,
+          bonus: 0.0,
+          tbChung: 10.0,
+          xepLoai: 'X sắc',
+          viThuChung: 1
+        };
+      }
+
+      // Lọc các bản ghi vi phạm thực tế đang hoạt động của lớp trong tuần
+      const activeViols = this.violations.filter(v => parseInt(v.week, 10) === w && v.class_name === cName);
+      const totalPenalty = activeViols.reduce((sum, v) => {
+        const pts = parseFloat(v.penalty_points !== undefined ? v.penalty_points : (v.points_deducted !== undefined ? v.points_deducted : v.points)) || 0;
+        return sum + pts;
+      }, 0);
+
+      const roundedDiemTru = Math.round(totalPenalty * 10) / 10;
+      this.emulationWeeks[w].classes[cName].diemTru = roundedDiemTru;
+      this.emulationWeeks[w].classes[cName]._forceSyncFromViolations = true;
+      if (activeViols.length === 0) {
+        this.emulationWeeks[w].classes[cName]._manuallyResetDiemTru = true;
+      }
+    });
+
+    // Tính toán lại thứ hạng, điểm TB, TB Chung, Xếp loại toàn tuần
+    this.calculateWeeklyEmulationRankings(w);
+    this.saveEmulationWeeks(true);
   }
 
   loadLockedWeeks() {
@@ -430,9 +491,8 @@ class DisciplineApp {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
-          // Đồng bộ Tuần 6 nếu dữ liệu cũ chưa có điểm trừ của 11A04
           if (window.DEFAULT_LOCKED_WEEKS && window.DEFAULT_LOCKED_WEEKS['6']) {
-            if (!parsed['6'] || !parsed['6'].classes || (parsed['6'].classes['11A04'] && parsed['6'].classes['11A04'].diemTru === 0)) {
+            if (!parsed['6'] || !parsed['6'].classes) {
               parsed['6'] = JSON.parse(JSON.stringify(window.DEFAULT_LOCKED_WEEKS['6']));
               try { localStorage.setItem('dshs_emulation_weeks', JSON.stringify(parsed)); } catch (e) {}
             }
@@ -1394,16 +1454,28 @@ class DisciplineApp {
   doConfirmSaveAiViolations() {
     if (!this.pendingAiRecords || this.pendingAiRecords.length === 0) return;
 
+    const affectedWeeksAndClasses = new Map();
     this.pendingAiRecords.forEach(rec => {
+      const w = rec.week || this.calculateWeek(rec.date);
+      const c = rec.class_name;
       this.violations.unshift({
         id: Date.now() + Math.random(),
-        week: rec.week || this.calculateWeek(rec.date),
+        week: w,
         date: rec.date || new Date().toISOString().split('T')[0],
         student_name: rec.student_name,
-        class_name: rec.class_name,
+        class_name: c,
         violation_category: rec.violation_category,
         penalty_points: parseFloat(rec.penalty_points) || 0.5,
         original_note: rec.original_text || rec.note || ''
+      });
+      if (!affectedWeeksAndClasses.has(w)) affectedWeeksAndClasses.set(w, new Set());
+      affectedWeeksAndClasses.get(w).add(c);
+    });
+
+    // Đồng bộ tức thì từng tuần và lớp bị ảnh hưởng
+    affectedWeeksAndClasses.forEach((classesSet, w) => {
+      classesSet.forEach(c => {
+        this.syncViolationWithEmulation(w, c);
       });
     });
 
@@ -1765,7 +1837,9 @@ class DisciplineApp {
             original_note: 'Nhập thủ công trực tiếp'
           });
 
-          this.saveViolations();
+          // Tự động đồng bộ và tính toán lại Bảng thi đua thời gian thực
+          this.syncViolationWithEmulation(week, className);
+          this.saveViolations(week, className);
 
           if (studentInput) {
             studentInput.value = '';
@@ -1873,9 +1947,14 @@ class DisciplineApp {
         `;
       } else {
         deleteBtn = `
-          <button onclick="window.app.deleteViolation(${v.id})" class="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer" title="Xóa bản ghi này">
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
+          <div class="flex items-center justify-center gap-1">
+            <button type="button" onclick="window.app.openEditViolationModal('${v.id}')" class="p-1 text-slate-400 hover:text-blue-600 rounded transition cursor-pointer" title="Sửa bản ghi vi phạm này">
+              <i data-lucide="edit-3" class="w-4 h-4"></i>
+            </button>
+            <button type="button" onclick="window.app.deleteViolation('${v.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer" title="Xóa bản ghi này">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
         `;
       }
 
@@ -1909,31 +1988,184 @@ class DisciplineApp {
 
   deleteViolation(id) {
     const target = this.violations.find(v => String(v.id) === String(id));
-    if (target && this.isWeekLocked(target.week)) {
-      this.showToast(`Vi phạm này thuộc Tuần ${target.week} đã được khóa niêm phong. Không thể xóa!`, 'error');
+    if (!target) {
+      this.showToast('Không tìm thấy bản ghi vi phạm này!', 'error');
+      return;
+    }
+
+    const targetWeek = parseInt(target.week, 10);
+    const targetClass = target.class_name;
+    const studentName = target.student_name || 'Học sinh';
+
+    if (this.isWeekLocked(targetWeek)) {
+      if (this.isAdmin()) {
+        if (confirm(`Vi phạm này thuộc Tuần ${targetWeek} đang được khóa niêm phong. Bạn đang có quyền Admin, bạn có muốn mở khóa Tuần ${targetWeek} để xóa bản ghi này không?`)) {
+          this.adminUnlockSpecificWeek(targetWeek);
+        } else {
+          return;
+        }
+      } else {
+        this.showToast(`Vi phạm này thuộc Tuần ${targetWeek} đã được khóa niêm phong an toàn. Chỉ Quản trị viên (Admin) mới có quyền mở khóa để xóa!`, 'error');
+        return;
+      }
+    }
+
+    this.requirePassword(() => {
+      const confirmMsg = `Bạn có chắc chắn muốn xóa bản ghi vi phạm của học sinh "${studentName}" (Lớp ${targetClass}, Tuần ${targetWeek})?\n\nHệ thống sẽ tự động tính toán lại điểm trừ nề nếp, TB Chung, Xếp loại và Vị thứ của Lớp ${targetClass} ngay lập tức!`;
+      if (!confirm(confirmMsg)) return;
+
+      // 1. Ghi nhận ID đã xóa để chống khôi phục ngoài ý muốn
+      this.trackDeletedViolationId(id, targetWeek, targetClass);
+
+      // 2. Xóa khỏi danh sách violations
+      this.violations = this.violations.filter(v => String(v.id) !== String(id));
+      localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+
+      // 3. Tự động tính toán lại điểm trừ của lớp và tuần tương ứng & cập nhật tức thì Bảng tổng hợp thi đua
+      this.syncViolationWithEmulation(targetWeek, targetClass);
+
+      // 4. Cập nhật lại giao diện
+      this.updateBadges();
+      this.renderLogsTable();
+      this.renderEmulationTable();
+      this.updateCharts();
+
+      // Nếu modal xem chi tiết vi phạm lớp đang mở, làm mới modal đó
+      const viewClassModal = document.getElementById('modal-view-class-violations');
+      if (viewClassModal && !viewClassModal.classList.contains('hidden')) {
+        this.viewClassViolations(targetWeek, targetClass);
+      }
+
+      const remainingViols = this.violations.filter(v => parseInt(v.week, 10) === targetWeek && v.class_name === targetClass);
+      const newDiemTru = remainingViols.reduce((s, v) => s + (parseFloat(v.penalty_points) || 0), 0);
+      this.showToast(`Đã xóa vi phạm thành công! Điểm trừ lớp ${targetClass} Tuần ${targetWeek} tự động cập nhật về -${newDiemTru.toFixed(1)}đ.`, 'success');
+    });
+  }
+
+  openEditViolationModal(id) {
+    const v = this.violations.find(item => String(item.id) === String(id));
+    if (!v) {
+      this.showToast('Không tìm thấy bản ghi vi phạm cần sửa!', 'error');
+      return;
+    }
+
+    const w = parseInt(v.week, 10);
+    if (this.isWeekLocked(w) && !this.isAdmin()) {
+      this.showToast(`Vi phạm này thuộc Tuần ${w} đã khóa niêm phong. Cần đăng nhập Admin để sửa!`, 'error');
       return;
     }
 
     this.requirePassword(() => {
-      if (confirm('Bạn có muốn xóa bản ghi vi phạm này?')) {
-        this.trackDeletedViolationId(id);
-        this.violations = this.violations.filter(v => String(v.id) !== String(id));
-        this.saveViolations();
-        this.renderLogsTable();
-        this.renderEmulationTable();
-        this.showToast('Đã xóa bản ghi vi phạm!', 'info');
+      const modal = document.getElementById('modal-edit-violation');
+      if (!modal) return;
+
+      document.getElementById('edit-viol-id').value = v.id;
+      document.getElementById('edit-viol-student').value = v.student_name || '';
+
+      const classSelect = document.getElementById('edit-viol-class');
+      if (classSelect) {
+        const classes = (window.DEFAULT_CLASSES || []).map(c => c.class);
+        classSelect.innerHTML = classes.map(c => `<option value="${c}" ${c === v.class_name ? 'selected' : ''}>${c}</option>`).join('');
       }
+
+      const genderSelect = document.getElementById('edit-viol-gender');
+      if (genderSelect) {
+        const currentGender = v.gender || this.getStudentGender(v.student_name, v.class_name);
+        genderSelect.value = currentGender;
+      }
+
+      const dateInput = document.getElementById('edit-viol-date');
+      if (dateInput) {
+        dateInput.value = v.date || new Date().toISOString().split('T')[0];
+      }
+
+      const weekSelect = document.getElementById('edit-viol-week');
+      if (weekSelect) {
+        let optHtml = '';
+        for (let i = 1; i <= 35; i++) {
+          optHtml += `<option value="${i}" ${i === w ? 'selected' : ''}>Tuần ${String(i).padStart(2, '0')}</option>`;
+        }
+        weekSelect.innerHTML = optHtml;
+      }
+
+      document.getElementById('edit-viol-category').value = v.violation_category || '';
+      document.getElementById('edit-viol-points').value = v.penalty_points !== undefined ? v.penalty_points : 0.5;
+      document.getElementById('edit-viol-note').value = v.original_note || '';
+
+      modal.classList.remove('hidden');
+      if (window.lucide) window.lucide.createIcons();
     });
   }
 
-  _oldDeleteViolation(id) {
-    if (confirm('Bạn có muốn xóa bản ghi vi phạm này?')) {
-      this.trackDeletedViolationId(id);
-      this.violations = this.violations.filter(v => String(v.id) !== String(id));
-      this.saveViolations();
-      this.renderLogsTable();
-      this.renderEmulationTable();
-      this.showToast('Đã xóa bản ghi vi phạm!', 'info');
+  handleSaveEditViolation(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const id = document.getElementById('edit-viol-id').value;
+    const v = this.violations.find(item => String(item.id) === String(id));
+    if (!v) {
+      this.showToast('Không tìm thấy bản ghi vi phạm!', 'error');
+      return;
+    }
+
+    const oldWeek = parseInt(v.week, 10);
+    const oldClass = v.class_name;
+
+    const newStudent = document.getElementById('edit-viol-student').value.trim();
+    const newClass = document.getElementById('edit-viol-class').value;
+    const newGender = document.getElementById('edit-viol-gender').value;
+    const newDate = document.getElementById('edit-viol-date').value;
+    const newWeek = parseInt(document.getElementById('edit-viol-week').value, 10);
+    const newCategory = document.getElementById('edit-viol-category').value.trim();
+    const newPoints = Math.abs(parseFloat(document.getElementById('edit-viol-points').value) || 0);
+    const newNote = document.getElementById('edit-viol-note').value.trim();
+
+    if (!newStudent || !newClass || isNaN(newWeek)) {
+      this.showToast('Vui lòng điền đầy đủ các thông tin bắt buộc!', 'error');
+      return;
+    }
+
+    // Cập nhật bản ghi
+    v.student_name = newStudent;
+    v.class_name = newClass;
+    v.gender = newGender;
+    v.date = newDate;
+    v.week = newWeek;
+    v.violation_category = newCategory;
+    v.penalty_points = newPoints;
+    v.original_note = newNote;
+
+    localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+
+    // Đồng bộ lại Bảng thi đua cho tuần/lớp cũ
+    this.syncViolationWithEmulation(oldWeek, oldClass);
+
+    // Nếu tuần hoặc lớp bị đổi, đồng bộ tiếp tuần/lớp mới
+    if (oldWeek !== newWeek || oldClass !== newClass) {
+      this.syncViolationWithEmulation(newWeek, newClass);
+    }
+
+    const modal = document.getElementById('modal-edit-violation');
+    if (modal) modal.classList.add('hidden');
+
+    this.updateBadges();
+    this.renderLogsTable();
+    this.renderEmulationTable();
+    this.updateCharts();
+
+    const viewClassModal = document.getElementById('modal-view-class-violations');
+    if (viewClassModal && !viewClassModal.classList.contains('hidden')) {
+      this.viewClassViolations(newWeek, newClass);
+    }
+
+    this.showToast(`Đã cập nhật vi phạm và tự động đồng bộ lại điểm thi đua của lớp ${newClass} Tuần ${newWeek}!`, 'success');
+  }
+
+  handleEditViolDateChange(dateVal) {
+    if (!dateVal) return;
+    const calculatedWeek = this.calculateWeek(dateVal);
+    const weekSelect = document.getElementById('edit-viol-week');
+    if (weekSelect && calculatedWeek >= 1 && calculatedWeek <= 35) {
+      weekSelect.value = calculatedWeek;
     }
   }
 
@@ -2052,16 +2284,23 @@ class DisciplineApp {
       // 2. Điểm trừ nề nếp:
       // Tự động liên kết và tính toán trực tiếp từ dữ liệu học sinh vi phạm ghi nhận trên hệ thống web
       let diemTru = 0.0;
-      let violationDetails = [];
-      if (isLocked && existing && existing.diemTru !== undefined) {
+      const violationDetails = this.violations.filter(v => parseInt(v.week, 10) === w && v.class_name === cName);
+
+      if (isLocked && existing && existing.diemTru !== undefined && !existing._forceSyncFromViolations) {
+        // Tuần đang khóa niêm phong: giữ nguyên điểm chốt trừ khi được mở khóa/đồng bộ
         diemTru = parseFloat(existing.diemTru) || 0.0;
-        violationDetails = this.violations.filter(v => parseInt(v.week, 10) === w && v.class_name === cName);
       } else {
-        violationDetails = this.violations.filter(v => parseInt(v.week, 10) === w && v.class_name === cName);
+        // Tuần đang mở hoặc đã mở khóa
         if (violationDetails.length > 0) {
           diemTru = violationDetails.reduce((sum, v) => sum + (parseFloat(v.penalty_points !== undefined ? v.penalty_points : (v.points_deducted !== undefined ? v.points_deducted : v.points)) || 0), 0);
-        } else if (existing && existing.diemTru !== undefined && existing.diemTru > 0) {
+        } else if (existing && (existing._forceSyncFromViolations || existing._manuallyResetDiemTru || w >= 7)) {
+          // Lớp đã được đồng bộ / xóa hết vi phạm / hoặc từ Tuần 7 trở đi: điểm trừ chính xác là 0.0
+          diemTru = 0.0;
+        } else if (existing && existing.diemTru !== undefined && !this.classHasDeletedViolations(w, cName)) {
+          // Chỉ giữ lại điểm trừ cũ nếu là dữ liệu tĩnh lịch sử (Tuần 1-6) và chưa từng bị xóa vi phạm
           diemTru = parseFloat(existing.diemTru) || 0.0;
+        } else {
+          diemTru = 0.0;
         }
       }
 
@@ -2101,6 +2340,8 @@ class DisciplineApp {
         tbChung: Math.round(tbChung * 1000) / 1000,
         xepLoai,
         violationDetails,
+        _forceSyncFromViolations: (existing && existing._forceSyncFromViolations) || (w >= 7) || false,
+        _manuallyResetDiemTru: (existing && existing._manuallyResetDiemTru) || false,
         viThuHocTap: 1,
         viThuNenNep: 1,
         viThuVang: 1,
@@ -2219,7 +2460,9 @@ class DisciplineApp {
         bonus: r.bonus,
         tbChung: r.tbChung,
         xepLoai: r.xepLoai,
-        viThuChung: r.viThuChung
+        viThuChung: r.viThuChung,
+        _forceSyncFromViolations: r._forceSyncFromViolations || false,
+        _manuallyResetDiemTru: r._manuallyResetDiemTru || false
       };
     });
 
@@ -2798,13 +3041,32 @@ class DisciplineApp {
     const tbody = document.getElementById('class-violations-tbody');
     if (tbody) {
       if (viols.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400">Không có vi phạm nào trong tuần được chọn.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-400">Không có vi phạm nào trong tuần được chọn.</td></tr>`;
       } else {
+        const isAuth = this.isDataEntryUnlocked();
+        const isLocked = this.isWeekLocked(w);
+        const canAction = isAuth && (!isLocked || this.isAdmin());
+
         tbody.innerHTML = viols.map((v, i) => {
           const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
           const genderBadge = gender === 'Nữ'
             ? `<span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nữ</span>`
             : `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nam</span>`;
+          
+          let actCol = `<span class="text-slate-300 flex justify-center"><i data-lucide="lock" class="w-3.5 h-3.5"></i></span>`;
+          if (canAction) {
+            actCol = `
+              <div class="flex items-center justify-center gap-1">
+                <button type="button" onclick="window.app.openEditViolationModal('${v.id}')" class="p-1 text-slate-400 hover:text-blue-600 rounded transition cursor-pointer" title="Sửa vi phạm">
+                  <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="window.app.deleteViolation('${v.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer" title="Xóa vi phạm">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            `;
+          }
+
           return `
             <tr class="hover:bg-slate-50 border-b border-slate-100">
               <td class="p-2.5 text-center font-bold text-slate-500">${i + 1}</td>
@@ -2816,6 +3078,7 @@ class DisciplineApp {
               <td class="p-2.5 text-center text-slate-600 text-xs">${this.formatDate(v.date)}</td>
               <td class="p-2.5 text-slate-800 font-semibold">${v.violation_category}</td>
               <td class="p-2.5 text-center font-bold text-red-600">-${v.penalty_points}đ</td>
+              <td class="p-2.5 text-center">${actCol}</td>
             </tr>
           `;
         }).join('');
@@ -4742,7 +5005,7 @@ class DisciplineApp {
     }
   }
 
-  trackDeletedViolationId(id) {
+  trackDeletedViolationId(id, week = null, className = null) {
     if (!this.deletedViolationIds) {
       this.deletedViolationIds = new Set();
     }
@@ -4751,6 +5014,27 @@ class DisciplineApp {
     try {
       localStorage.setItem('dshs_deleted_violations_ids', JSON.stringify(Array.from(this.deletedViolationIds)));
     } catch (e) {}
+
+    if (week && className) {
+      if (!this.deletedViolationMeta) this.deletedViolationMeta = [];
+      this.deletedViolationMeta.push({ id: String(id), week: parseInt(week, 10), className });
+      try {
+        localStorage.setItem('dshs_deleted_violations_meta', JSON.stringify(this.deletedViolationMeta));
+      } catch (e) {}
+    }
+  }
+
+  classHasDeletedViolations(weekNum, className) {
+    const w = parseInt(weekNum, 10);
+    if (!this.deletedViolationMeta) {
+      try {
+        const saved = localStorage.getItem('dshs_deleted_violations_meta');
+        this.deletedViolationMeta = saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        this.deletedViolationMeta = [];
+      }
+    }
+    return (this.deletedViolationMeta || []).some(m => parseInt(m.week, 10) === w && m.className === className);
   }
 
   updateCloudStatusBadge(isOnline = true) {
