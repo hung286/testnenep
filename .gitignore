@@ -5,3 +5,5 @@ nenep/
 tesnenep/
 testnenep/
 .vercel
+desktop.ini
+*.tmp

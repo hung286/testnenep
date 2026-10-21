@@ -1105,7 +1105,34 @@
             </div>
           </div>
 
-          <!-- Card 3: Cập nhật & Đồng bộ Máy chủ nội bộ của trường -->
+          <!-- Card 3: Cơ Sở Dữ Liệu Đám Mây Google Sheets -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                <i data-lucide="cloud" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="font-bold text-slate-900 text-sm">3. Cơ Sở Dữ Liệu Đám Mây Google Sheets</h3>
+                <p class="text-xs text-slate-500">Đồng bộ tự động 2 chiều tức thì giữa Điện thoại & Máy tính</p>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-600 leading-relaxed mb-4">
+              Dữ liệu vi phạm và thi đua được tự động đẩy lên <strong>Google Sheets</strong> qua Google Apps Script Web App Endpoint. Cho phép các giám thị dùng điện thoại di động ghi nhận vi phạm tại sân trường mà <strong>không cần đăng nhập Google</strong>.
+            </p>
+
+            <div class="flex items-center gap-2">
+              <button onclick="window.app.syncCloudData(false)" class="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition text-xs cursor-pointer shadow-xs">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                <span>Đồng Bộ Google Sheets Ngay</span>
+              </button>
+              <button onclick="window.app.openSettingsModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition text-xs cursor-pointer border border-slate-200" title="Cấu hình Google Sheets Endpoint">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Card 4: Cập nhật & Đồng bộ Máy chủ nội bộ của trường -->
           <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
             <div class="flex items-center gap-3 mb-3">
               <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
@@ -1322,36 +1349,80 @@
           </div>
         </div>
 
-      <!-- Cloud Database Configuration Section -->
+      <!-- Cloud Database Configuration Section (Google Sheets Official Integration) -->
         <div class="pt-4 border-t border-slate-200">
           <div class="flex items-center justify-between mb-2">
-            <label class="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <i data-lucide="database" class="w-4 h-4 text-blue-600"></i>
-              <span>Cơ Sở Dữ Liệu Đám Mây (Cloud Database)</span>
+            <label class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span class="w-5 h-5 rounded-md bg-emerald-600 text-white flex items-center justify-center font-bold text-[11px] shadow-xs">GS</span>
+              <span>Cơ Sở Dữ Liệu Google Sheets (Cloud Database)</span>
             </label>
             <span id="cloud-status-indicator" class="text-[11px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span id="cloud-status-indicator-text">Đang kết nối</span>
             </span>
           </div>
-          <p class="text-[11px] text-slate-500 mb-2">
-            Hệ thống tự động lưu trữ và đồng bộ 2 chiều tức thì giữa <strong>Điện thoại</strong> và <strong>Máy tính</strong>. Mọi thao tác thêm/xóa vi phạm đều được bảo vệ an toàn trên Đám mây.
-          </p>
 
-          <div class="space-y-2">
-            <div>
-              <label class="text-[11px] font-semibold text-slate-600 block mb-1">Địa chỉ Cloud Endpoint (KVDB / Firebase Realtime / REST API):</label>
-              <input type="text" id="input-cloud-url" placeholder="https://kvdb.io/... hoặc https://<project>.firebaseio.com/violations.json"
-                     class="w-full text-xs font-mono p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+          <div class="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl mb-3 text-xs text-emerald-950 space-y-1.5 leading-relaxed">
+            <div class="flex items-center gap-2 font-bold text-emerald-900">
+              <i data-lucide="cloud-lightning" class="w-4 h-4 text-emerald-600"></i>
+              <span>Tự động đồng bộ 2 chiều thời gian thực với Google Sheets</span>
             </div>
+            <p class="text-[11px] text-emerald-800">
+              Mọi thay đổi khi Thêm, Sửa, Xóa vi phạm trên Web hoặc Điện thoại đều tự động đẩy lên Google Sheets ngay lập tức. Thiết bị di động chỉ cần mở link là dùng được ngay, <strong>hoàn toàn không cần đăng nhập Google</strong>.
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[11px] font-semibold text-slate-700">Đường dẫn Google Apps Script Web App Endpoint:</label>
+                <button type="button" id="btn-toggle-gas-guide" class="text-[11px] font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer">
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                  <span>Xem hướng dẫn kết nối 3 bước</span>
+                </button>
+              </div>
+              <input type="text" id="input-cloud-url" placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+                     class="w-full text-xs font-mono p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50">
+            </div>
+
+            <!-- Hướng dẫn 3 bước kết nối Google Sheets (Có thể ẩn/hiện) -->
+            <div id="gas-guide-box" class="hidden bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 text-slate-700">
+              <div class="font-bold text-slate-900 flex items-center gap-1.5">
+                <i data-lucide="book-open" class="w-4 h-4 text-emerald-600"></i>
+                <span>Hướng dẫn 3 bước tạo Google Sheets Cloud Database (Miễn phí 100%):</span>
+              </div>
+              <ol class="list-decimal pl-5 space-y-1.5 text-[11px] leading-relaxed">
+                <li>Mở file Google Sheet mới tại <a href="https://sheets.new" target="_blank" class="text-blue-600 font-bold underline">sheets.new</a> &rarr; Chọn menu <strong>Tiện ích mở rộng (Extensions)</strong> &rarr; <strong>Apps Script</strong>.</li>
+                <li>Xóa toàn bộ code cũ, bấm nút <strong>"Sao chép mã Apps Script"</strong> bên dưới rồi dán vào trình soạn thảo và bấm <strong>Ctrl+S</strong> (Lưu).</li>
+                <li>Bấm nút <strong>Triển khai (Deploy)</strong> ở góc phải &rarr; <strong>Tùy chọn triển khai mới (New deployment)</strong>:
+                  <ul class="list-disc pl-4 mt-1 space-y-0.5 text-slate-600">
+                    <li>Loại: Chọn <strong>Ứng dụng web (Web app)</strong></li>
+                    <li>Thực thi dưới dạng: Chọn <strong>Tôi (Me)</strong> <em>(Bắt buộc)</em></li>
+                    <li>Người có quyền truy cập: Chọn <strong>Bất kỳ ai (Anyone)</strong> <em>(Để điện thoại không cần đăng nhập Google)</em></li>
+                  </ul>
+                  Sau đó bấm <strong>Triển khai</strong>, cấp quyền cho script và sao chép <strong>URL Ứng dụng web</strong> dán vào ô trên.
+                </li>
+              </ol>
+              <div class="flex flex-wrap items-center gap-2 pt-1">
+                <button type="button" id="btn-copy-gas-code" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer shadow-xs transition">
+                  <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                  <span>Sao chép mã Google Apps Script</span>
+                </button>
+                <button type="button" id="btn-download-gas-file" class="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold rounded-lg text-[11px] flex items-center gap-1 cursor-pointer transition">
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                  <span>Tải file script (.gs)</span>
+                </button>
+              </div>
+            </div>
+
             <div class="flex flex-wrap items-center gap-2 pt-1">
               <button type="button" id="btn-test-cloud-connection" 
-                      class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer">
+                      class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5 cursor-pointer shadow-xs">
                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                 <span>Kiểm tra & Đồng bộ ngay</span>
               </button>
               <button type="button" id="btn-backup-violations-json" 
-                      class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer">
+                      class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-bold rounded-lg transition flex items-center gap-1 cursor-pointer">
                 <i data-lucide="download" class="w-3.5 h-3.5"></i>
                 <span>Tải file sao lưu JSON</span>
               </button>

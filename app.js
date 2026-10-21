@@ -526,6 +526,7 @@ class DisciplineApp {
       if (!silent) {
         this.showToast('Đã lưu dữ liệu bảng thi đua thành công!', 'success');
       }
+      this.debouncedPushToCloud(true);
     } catch (e) {
       this.showToast('Lỗi lưu bảng thi đua: ' + e.message, 'error');
     }
@@ -2028,6 +2029,9 @@ class DisciplineApp {
         this.viewClassViolations(targetWeek, targetClass);
       }
 
+      // 5. Tự động đồng bộ thời gian thực lên Cloud Database (Google Sheets)
+      this.pushToCloud(true);
+
       const remainingViols = this.violations.filter(v => parseInt(v.week, 10) === targetWeek && v.class_name === targetClass);
       const newDiemTru = remainingViols.reduce((s, v) => s + (parseFloat(v.penalty_points) || 0), 0);
       this.showToast(`Đã xóa vi phạm thành công! Điểm trừ lớp ${targetClass} Tuần ${targetWeek} tự động cập nhật về -${newDiemTru.toFixed(1)}đ.`, 'success');
@@ -2158,6 +2162,9 @@ class DisciplineApp {
     if (viewClassModal && !viewClassModal.classList.contains('hidden')) {
       this.viewClassViolations(newWeek, newClass);
     }
+
+    // Tự động đồng bộ thời gian thực lên Cloud Database (Google Sheets)
+    this.pushToCloud(true);
 
     this.showToast(`Đã cập nhật vi phạm và tự động đồng bộ lại điểm thi đua của lớp ${newClass} Tuần ${newWeek}!`, 'success');
   }
@@ -3112,6 +3119,7 @@ class DisciplineApp {
   saveBonusPoints() {
     localStorage.setItem('dshs_bonus_points', JSON.stringify(this.bonusPoints));
     this.renderBonusPointsTable();
+    this.debouncedPushToCloud(true);
   }
 
   getBonusPoints(weekNum, className) {
@@ -4562,11 +4570,50 @@ class DisciplineApp {
         window.geminiService.setApiKey(key);
         window.geminiService.setSelectedModel(modelId);
 
+        const inputCloudUrl = document.getElementById('input-cloud-url');
+        if (inputCloudUrl) {
+          const newCloudUrl = inputCloudUrl.value.trim();
+          this.setCloudUrl(newCloudUrl);
+        }
+
         document.getElementById('display-current-model-tag').textContent = modelId;
         this.updateBadges();
+        this.updateCloudStatusBadge(true);
         modal.classList.add('hidden');
-        this.showToast('Đã lưu thiết lập Gemini API Key và Model thành công!', 'success');
+        this.showToast('Đã lưu thiết lập Gemini API Key và Cloud Database thành công!', 'success');
+
+        // Tự động kiểm tra và đồng bộ đám mây ngay lập tức
+        this.syncCloudData(true);
       });
+    }
+
+    // Các nút thao tác Google Sheets & Cloud Database
+    const btnToggleGuide = document.getElementById('btn-toggle-gas-guide');
+    const guideBox = document.getElementById('gas-guide-box');
+    if (btnToggleGuide && guideBox) {
+      btnToggleGuide.onclick = () => {
+        guideBox.classList.toggle('hidden');
+      };
+    }
+
+    const btnTestCloud = document.getElementById('btn-test-cloud-connection');
+    if (btnTestCloud) {
+      btnTestCloud.onclick = () => this.testCloudConnection();
+    }
+
+    const btnBackupJson = document.getElementById('btn-backup-violations-json');
+    if (btnBackupJson) {
+      btnBackupJson.onclick = () => this.exportViolationsBackupJson();
+    }
+
+    const btnCopyGas = document.getElementById('btn-copy-gas-code');
+    if (btnCopyGas) {
+      btnCopyGas.onclick = () => this.copyGasCode();
+    }
+
+    const btnDownloadGas = document.getElementById('btn-download-gas-file');
+    if (btnDownloadGas) {
+      btnDownloadGas.onclick = () => this.downloadGasFile();
     }
 
     if (btnDelete) {
@@ -4589,6 +4636,12 @@ class DisciplineApp {
 
     const currentModel = window.geminiService.getSelectedModel();
     this.selectModelCard(currentModel);
+
+    const inputCloudUrl = document.getElementById('input-cloud-url');
+    if (inputCloudUrl) {
+      inputCloudUrl.value = this.getCloudUrl();
+    }
+    this.updateCloudStatusBadge(true);
 
     modal.classList.remove('hidden');
     inputKey.focus();
@@ -5035,7 +5088,7 @@ class DisciplineApp {
     }
   }
 
-  // ==================== CƠ SỞ DỮ LIỆU ĐÁM MÂY (CLOUD DATABASE) ====================
+  // ==================== CƠ SỞ DỮ LIỆU ĐÁM MÂY (GOOGLE SHEETS CLOUD DATABASE) ====================
 
   get DEFAULT_CLOUD_URL() {
     return 'https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/violations';
@@ -5098,24 +5151,36 @@ class DisciplineApp {
     const badge = document.getElementById('cloud-sync-badge');
     const indicatorText = document.getElementById('cloud-status-indicator-text');
     const indicator = document.getElementById('cloud-status-indicator');
+    const cloudUrl = this.getCloudUrl();
+    const isGAS = cloudUrl.includes('script.google.com');
+    const name = isGAS ? 'Google Sheets' : 'Cloud';
 
     if (badge) {
       badge.className = isOnline 
         ? 'w-2 h-2 rounded-full bg-emerald-500' 
         : 'w-2 h-2 rounded-full bg-amber-500';
       badge.title = isOnline 
-        ? 'Cloud Database: Đang kết nối thông suốt' 
-        : 'Cloud Database: Ngoại tuyến (Đã lưu trên máy)';
+        ? `${name} Database: Đang kết nối thông suốt` 
+        : `${name} Database: Ngoại tuyến (Đã lưu an toàn trên máy)`;
     }
 
     if (indicatorText) {
-      indicatorText.textContent = isOnline ? 'Đang kết nối' : 'Ngoại tuyến';
+      indicatorText.textContent = isOnline ? `Đang kết nối ${name}` : 'Ngoại tuyến';
     }
     if (indicator) {
       indicator.className = isOnline
         ? 'text-[11px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5'
         : 'text-[11px] font-bold text-amber-700 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1.5';
     }
+  }
+
+  debouncedPushToCloud(silent = true) {
+    if (this._cloudPushTimer) {
+      clearTimeout(this._cloudPushTimer);
+    }
+    this._cloudPushTimer = setTimeout(() => {
+      this.pushToCloud(silent);
+    }, 400);
   }
 
   async pushToCloud(silent = true) {
@@ -5125,21 +5190,31 @@ class DisciplineApp {
     try {
       let method = 'POST';
       let headers = { 'Content-Type': 'application/json' };
+      const isGAS = cloudUrl.includes('script.google.com');
 
       // Hỗ trợ Firebase Realtime Database REST API (sử dụng method PUT)
       if (cloudUrl.includes('.firebaseio.com') || cloudUrl.includes('.firebasedatabase.app')) {
         method = 'PUT';
       }
 
+      // Với Google Apps Script Web App, BẮT BUỘC dùng Content-Type: text/plain;charset=utf-8 để tránh CORS preflight OPTIONS
+      if (isGAS) {
+        headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+      }
+
       const payload = {
+        action: 'sync',
         version: 2,
         updated_at: Date.now(),
         violations: this.violations,
-        deleted_ids: Array.from(this.deletedViolationIds || [])
+        deleted_ids: Array.from(this.deletedViolationIds || []),
+        emulation_weeks: this.emulationWeeks || {},
+        bonus_points: this.bonusPoints || {}
       };
 
       const res = await fetch(cloudUrl, {
         method: method,
+        mode: 'cors',
         headers: headers,
         body: JSON.stringify(payload)
       });
@@ -5148,7 +5223,8 @@ class DisciplineApp {
         localStorage.setItem('dshs_last_sync_time', new Date().toISOString());
         this.updateCloudStatusBadge(true);
         if (!silent) {
-          this.showToast(`Đã đồng bộ an toàn ${this.violations.length} bản ghi vi phạm lên Cloud!`, 'success');
+          const targetName = isGAS ? 'Google Sheets' : 'Cloud';
+          this.showToast(`Đã đồng bộ an toàn ${this.violations.length} bản ghi vi phạm lên ${targetName}!`, 'success');
         }
         return true;
       } else {
@@ -5175,14 +5251,33 @@ class DisciplineApp {
     this._lastPullTime = now;
 
     try {
-      const res = await fetch(`${cloudUrl}?t=${now}`);
+      const isGAS = cloudUrl.includes('script.google.com');
+      const fetchUrl = isGAS
+        ? (cloudUrl.includes('?') ? `${cloudUrl}&action=get&t=${now}` : `${cloudUrl}?action=get&t=${now}`)
+        : (cloudUrl.includes('?') ? `${cloudUrl}&t=${now}` : `${cloudUrl}?t=${now}`);
+
+      const res = await fetch(fetchUrl, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-cache'
+      });
+
       if (!res.ok) {
         return false;
       }
 
-      let data = await res.json();
+      let jsonResp = await res.json();
+      let data = jsonResp;
+
+      // Chuẩn hóa phản hồi từ Google Apps Script Web App: { status: 'success', data: { ... } }
+      if (jsonResp && jsonResp.data && (Array.isArray(jsonResp.data.violations) || typeof jsonResp.data === 'object')) {
+        data = jsonResp.data;
+      }
+
       let cloudViolations = [];
       let cloudDeletedIds = [];
+      let cloudEmulationWeeks = null;
+      let cloudBonusPoints = null;
 
       if (Array.isArray(data)) {
         cloudViolations = data;
@@ -5192,6 +5287,12 @@ class DisciplineApp {
           if (Array.isArray(data.deleted_ids)) {
             cloudDeletedIds = data.deleted_ids;
           }
+          if (data.emulation_weeks && typeof data.emulation_weeks === 'object') {
+            cloudEmulationWeeks = data.emulation_weeks;
+          }
+          if (data.bonus_points && typeof data.bonus_points === 'object') {
+            cloudBonusPoints = data.bonus_points;
+          }
         } else {
           cloudViolations = Object.values(data);
         }
@@ -5199,6 +5300,7 @@ class DisciplineApp {
 
       // 1. Đồng bộ danh sách ID đã xóa từ Cloud về máy này
       if (cloudDeletedIds.length > 0) {
+        if (!this.deletedViolationIds) this.deletedViolationIds = new Set();
         cloudDeletedIds.forEach(id => {
           if (id) this.deletedViolationIds.add(String(id));
         });
@@ -5229,23 +5331,68 @@ class DisciplineApp {
         }
       });
 
-      // 5. Sắp xếp lại danh sách hợp nhất theo thứ tự thời gian/ID
-      const mergedList = Array.from(localMap.values()).sort((a, b) => {
-        const dateA = new Date(a.date || 0).getTime();
-        const dateB = new Date(b.date || 0).getTime();
-        if (dateB !== dateA) return dateB - dateA;
-        return (b.id || 0) - (a.id || 0);
-      });
+      // 5. Sắp xếp lại danh sách hợp nhất theo thứ tự thời gian/ID và lớp A -> Z
+      const mergedList = this.sortViolations(Array.from(localMap.values()));
 
       const oldCount = this.violations.length;
-      const dataChanged = hasNewFromCloud || (initialCount !== oldCount) || (mergedList.length !== oldCount);
+      let dataChanged = hasNewFromCloud || (initialCount !== oldCount) || (mergedList.length !== oldCount);
       this.violations = mergedList;
       localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+
+      // 6. Hợp nhất Emulation Weeks nếu có từ Cloud
+      if (cloudEmulationWeeks && typeof cloudEmulationWeeks === 'object') {
+        Object.keys(cloudEmulationWeeks).forEach(wKey => {
+          const w = parseInt(wKey, 10);
+          if (!isNaN(w) && cloudEmulationWeeks[wKey]) {
+            if (!this.emulationWeeks[w]) {
+              this.emulationWeeks[w] = cloudEmulationWeeks[wKey];
+              dataChanged = true;
+            } else {
+              const cloudClasses = cloudEmulationWeeks[wKey].classes || {};
+              const localClasses = this.emulationWeeks[w].classes || {};
+              Object.keys(cloudClasses).forEach(cName => {
+                if (!localClasses[cName]) {
+                  localClasses[cName] = cloudClasses[cName];
+                  dataChanged = true;
+                }
+              });
+            }
+          }
+        });
+        localStorage.setItem('dshs_emulation_weeks', JSON.stringify(this.emulationWeeks));
+      }
+
+      // 7. Hợp nhất Bonus Points nếu có từ Cloud
+      if (cloudBonusPoints && typeof cloudBonusPoints === 'object') {
+        let bonusChanged = false;
+        Object.keys(cloudBonusPoints).forEach(wKey => {
+          if (!this.bonusPoints[wKey]) {
+            this.bonusPoints[wKey] = cloudBonusPoints[wKey];
+            bonusChanged = true;
+          } else {
+            const existingIds = new Set(this.bonusPoints[wKey].map(b => String(b.id || b.timestamp || '')));
+            (cloudBonusPoints[wKey] || []).forEach(cb => {
+              const bId = String(cb.id || cb.timestamp || '');
+              if (bId && !existingIds.has(bId)) {
+                this.bonusPoints[wKey].push(cb);
+                existingIds.add(bId);
+                bonusChanged = true;
+              }
+            });
+          }
+        });
+        if (bonusChanged) {
+          localStorage.setItem('dshs_bonus_points', JSON.stringify(this.bonusPoints));
+          dataChanged = true;
+        }
+      }
+
       this.updateBadges();
 
       if (dataChanged) {
         this.renderLogsTable();
         this.renderEmulationTable();
+        this.updateCharts();
         // Đẩy lại toàn bộ danh sách hợp nhất lên Cloud để 2 bên đồng nhất 100%
         this.pushToCloud(true);
       }
@@ -5277,13 +5424,17 @@ class DisciplineApp {
       if (pullSuccess) {
         await this.pushToCloud(true);
         if (!silent) {
-          this.showToast(`Đồng bộ Cloud thành công! Có ${this.violations.length} bản ghi vi phạm được bảo vệ an toàn.`, 'success');
+          const isGAS = this.getCloudUrl().includes('script.google.com');
+          const name = isGAS ? 'Google Sheets' : 'Cloud';
+          this.showToast(`Đồng bộ ${name} thành công! Có ${this.violations.length} bản ghi vi phạm được bảo vệ an toàn.`, 'success');
         }
       } else {
         // Nếu không kéo được, thử đẩy dữ liệu hiện có lên cloud
         const pushSuccess = await this.pushToCloud(true);
         if (pushSuccess && !silent) {
-          this.showToast(`Đã đồng bộ ${this.violations.length} bản ghi vi phạm lên Cloud!`, 'success');
+          const isGAS = this.getCloudUrl().includes('script.google.com');
+          const name = isGAS ? 'Google Sheets' : 'Cloud';
+          this.showToast(`Đã đồng bộ ${this.violations.length} bản ghi vi phạm lên ${name}!`, 'success');
         } else if (!silent) {
           this.showToast('Không thể kết nối Cloud. Đang hoạt động Offline (Dữ liệu đã lưu an toàn trên máy).', 'warning');
         }
@@ -5306,27 +5457,76 @@ class DisciplineApp {
     const inputUrl = document.getElementById('input-cloud-url');
     const url = inputUrl ? inputUrl.value.trim() : this.getCloudUrl();
     if (!url) {
-      this.showToast('Vui lòng nhập địa chỉ Cloud Endpoint!', 'error');
+      this.showToast('Vui lòng nhập địa chỉ Google Apps Script Web App hoặc Cloud Endpoint!', 'error');
       return;
     }
 
-    this.showToast('Đang kiểm tra kết nối Cloud Database...', 'info');
+    const isGAS = url.includes('script.google.com');
+    const cloudName = isGAS ? 'Google Sheets' : 'Cloud Database';
+    this.showToast(`Đang kiểm tra kết nối ${cloudName}...`, 'info');
+
     try {
-      const res = await fetch(`${url}?t=${Date.now()}`);
+      const testUrl = isGAS
+        ? (url.includes('?') ? `${url}&action=ping&t=${Date.now()}` : `${url}?action=ping&t=${Date.now()}`)
+        : (url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`);
+
+      const res = await fetch(testUrl, { method: 'GET', mode: 'cors', cache: 'no-cache' });
       if (res.ok) {
-        const data = await res.json();
-        const count = Array.isArray(data) ? data.length : (data && typeof data === 'object' ? Object.keys(data).length : 0);
+        let respData = null;
+        try { respData = await res.json(); } catch(e){}
+
         this.setCloudUrl(url);
         this.updateCloudStatusBadge(true);
-        this.showToast(`Kết nối Cloud thành công! Tìm thấy ${count} bản ghi vi phạm trên Đám mây.`, 'success');
-        this.syncCloudData(true);
+
+        const detailMsg = (respData && respData.spreadsheet_name) 
+          ? `Bảng tính: "${respData.spreadsheet_name}"` 
+          : 'Kết nối thông suốt!';
+        this.showToast(`Kết nối ${cloudName} thành công! ${detailMsg}`, 'success');
+
+        // Tiến hành kéo và đồng bộ ngay lập tức
+        await this.syncCloudData(true);
       } else {
         this.updateCloudStatusBadge(false);
-        this.showToast(`Không thể kết nối Cloud (Mã phản hồi HTTP ${res.status})`, 'error');
+        this.showToast(`Không thể kết nối ${cloudName} (Mã phản hồi HTTP ${res.status})`, 'error');
       }
     } catch (e) {
       this.updateCloudStatusBadge(false);
-      this.showToast(`Lỗi kết nối: ${e.message}`, 'error');
+      this.showToast(`Lỗi kết nối ${cloudName}: ${e.message}`, 'error');
+    }
+  }
+
+  async copyGasCode() {
+    try {
+      let code = '';
+      try {
+        const res = await fetch('google_apps_script.js');
+        if (res.ok) code = await res.text();
+      } catch (e) {}
+
+      if (code) {
+        await navigator.clipboard.writeText(code);
+        this.showToast('Đã sao chép toàn bộ mã Google Apps Script vào Clipboard!', 'success');
+      } else {
+        window.open('google_apps_script.js', '_blank');
+        this.showToast('Đang mở file google_apps_script.js trong tab mới để xem mã!', 'info');
+      }
+    } catch (err) {
+      window.open('google_apps_script.js', '_blank');
+      this.showToast('Không thể sao chép tự động. Đang mở mã trong tab mới!', 'info');
+    }
+  }
+
+  downloadGasFile() {
+    try {
+      const a = document.createElement('a');
+      a.href = 'google_apps_script.gs';
+      a.download = 'google_apps_script.gs';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      this.showToast('Đang tải file google_apps_script.gs về máy!', 'success');
+    } catch (e) {
+      this.showToast('Lỗi khi tải file: ' + e.message, 'error');
     }
   }
 

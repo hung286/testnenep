@@ -66,17 +66,29 @@ Hệ thống hoạt động 100% trên trình duyệt người dùng (Client-Sid
 ```
 quanlinenep/
 ├── index.html            # Giao diện chính (Tailwind CSS, Lucide Icons, SheetJS, Chart.js)
-├── app.js                # Nghiệp vụ: Tính tuần, CRUD học sinh/lỗi, tổng hợp xếp hạng
+├── app.js                # Nghiệp vụ: Tính tuần, CRUD học sinh/lỗi, RBAC 3 cấp, Cloud Sync
 ├── gemini-service.js     # Bộ não AI Gemini: Fallback chain, parse tự nhiên, kiểm soát lỗi
+├── google_apps_script.js # Backend Cloud Database Google Sheets (Apps Script Web App)
+├── google_apps_script.gs # File Google Apps Script (.gs) tải về
 ├── style.css             # Giao diện sư phạm hiện đại, thiết kế theo chuẩn SKILL EDUCATION
 ├── data_initial.js       # Dữ liệu dự phòng nhúng sẵn (1.226 HS & 33 quy định lỗi)
 ├── data_students.json    # CSDL trích xuất 1.226 học sinh 29 lớp THPT Lê Hồng Phong
 ├── data_rules.json       # CSDL trích xuất 33 danh mục lỗi vi phạm kèm khung điểm trừ
 ├── vercel.json           # Cấu hình routing SPA cho Vercel
 ├── DSHS.xlsm             # File Excel gốc của nhà trường
-├── AI_INSTRUCTIONS.md    # Quy tắc phát triển & vận hành dự án
 └── README.md             # Tài liệu hướng dẫn sử dụng & triển khai
 ```
+
+---
+
+## 📊 Cơ Sở Dữ Liệu Đám Mây Google Sheets (Cloud Database)
+
+Hệ thống hỗ trợ tích hợp trực tiếp **Google Sheets** thông qua **Google Apps Script Web App Endpoint**:
+- **Đồng bộ tự động 2 chiều:** Thêm, Sửa, Xóa học sinh vi phạm hoặc chỉnh sửa bảng thi đua đều tự động đẩy lên Google Sheets thời gian thực qua `fetch(async/await)`.
+- **Hoạt động đa thiết bị:** Điện thoại (iPhone, Android) và Máy tính bảng chỉ cần mở đường link trên trình duyệt là sử dụng được ngay, **hoàn toàn không cần đăng nhập Google**.
+- **Trang tính trực quan:**
+  - `NhatKyViPham`: Tự động ghi lại từng học sinh vi phạm, sắp xếp thứ tự lớp từ A &rarr; Z ($10B01 \rightarrow 12C09$).
+  - `BangTongHopThiDua`: Bảng tổng hợp thi đua theo tuần, TB nề nếp, điểm học tập, TB chung, xếp loại và vị thứ.
 
 ---
 
