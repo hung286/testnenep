@@ -216,7 +216,7 @@ class DisciplineApp {
   }
 
   adminUnlockAllWeeks() {
-    this.requirePassword(() => {
+    this.requireAdmin(() => {
       this.lockedWeeks = [];
       this.saveLockedWeeks();
       this.renderManageWeeksList();
@@ -227,7 +227,7 @@ class DisciplineApp {
 
   adminUnlockSpecificWeek(weekNum) {
     const w = parseInt(weekNum, 10);
-    this.requirePassword(() => {
+    this.requireAdmin(() => {
       this.lockedWeeks = this.lockedWeeks.filter(x => x !== w);
       this.saveLockedWeeks();
       this.renderManageWeeksList();
@@ -237,7 +237,7 @@ class DisciplineApp {
   }
 
   lockSpecificWeek(weekNum) {
-    this.requirePassword(() => {
+    this.requireAdmin(() => {
       const w = parseInt(weekNum, 10);
       if (!this.lockedWeeks.includes(w)) {
         this.lockedWeeks.push(w);
@@ -332,7 +332,7 @@ class DisciplineApp {
   }
 
   openCurrentWeekOnly() {
-    this.requirePassword(() => {
+    this.requireAdmin(() => {
       const curW = this.calculateWeek(new Date());
       const maxWeeks = Math.max(35, curW + 2);
       this.lockedWeeks = [];
@@ -535,16 +535,21 @@ class DisciplineApp {
 
   switchTab(targetTab) {
     const SENSITIVE_ADMIN_TABS = ['tab-students', 'tab-rules', 'tab-backup'];
-    if (SENSITIVE_ADMIN_TABS.includes(targetTab) && !this.isDataEntryUnlocked()) {
+    if (SENSITIVE_ADMIN_TABS.includes(targetTab) && !this.isAdmin()) {
       let tabName = 'mục quản trị này';
       if (targetTab === 'tab-students') tabName = 'Quản Lý Học Sinh';
       else if (targetTab === 'tab-rules') tabName = 'Danh Mục Lỗi & Điểm';
       else if (targetTab === 'tab-backup') tabName = 'Sao Lưu & Bảo Vệ Dữ Liệu';
 
-      this.showToast(`🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin. Vui lòng nhập mật khẩu quản trị để truy cập!`, 'warning');
+      const isSuper = this.isSupervisor();
+      const msg = isSuper
+        ? `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin cấp cao (Mật khẩu: 2806). Bạn đang ở quyền Giám thị / Cờ đỏ!`
+        : `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin. Vui lòng nhập mật khẩu Admin để truy cập!`;
+
+      this.showToast(msg, 'warning');
       this.openPasswordModal(() => {
         this.switchTab(targetTab);
-      });
+      }, true);
       return;
     }
 
@@ -2183,10 +2188,13 @@ class DisciplineApp {
     const isAuth = this.isDataEntryUnlocked();
     const canEdit = isAuth && !isLocked;
 
-    // 1. Cập nhật Banner Chế độ Bảo mật (Chỉ xem) vs Quyền Admin
+    // 1. Cập nhật Banner Chế độ Bảo mật (Chỉ xem) vs Quyền Admin vs Giám thị / Cờ đỏ
     const readonlyBanner = document.getElementById('emulation-readonly-banner');
+    const isAdmin = this.isAdmin();
+    const isSupervisor = this.isSupervisor();
+
     if (readonlyBanner) {
-      if (!isAuth) {
+      if (!isSupervisor) {
         readonlyBanner.innerHTML = `
           <div class="p-3.5 bg-amber-50 border border-amber-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 shadow-xs">
             <div class="flex items-center gap-2.5">
@@ -2195,16 +2203,16 @@ class DisciplineApp {
               </div>
               <div>
                 <p class="font-extrabold text-amber-950 text-xs sm:text-sm">Chế độ Bảo mật: Đang ở trạng thái CHỈ XEM (Read-only)</p>
-                <p class="text-[11px] text-amber-800 mt-0.5">Toàn bộ tính năng Thêm, Sửa, Xóa, Nhập điểm, Import file và Khóa/Mở tuần đều bị vô hiệu hóa an toàn. Vui lòng bấm đăng nhập để chuyển sang chế độ quản trị.</p>
+                <p class="text-[11px] text-amber-800 mt-0.5">Toàn bộ tính năng Thêm, Sửa, Xóa, Nhập điểm, Import file và Khóa/Mở tuần đều bị vô hiệu hóa an toàn. Vui lòng bấm đăng nhập để chuyển sang chế độ quản trị hoặc nề nếp.</p>
               </div>
             </div>
             <button type="button" onclick="window.app.openPasswordModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold rounded-xl text-xs transition cursor-pointer flex-shrink-0 flex items-center justify-center gap-1.5 shadow-xs">
               <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
-              <span>Đăng nhập Admin</span>
+              <span>Đăng nhập</span>
             </button>
           </div>
         `;
-      } else {
+      } else if (isAdmin) {
         readonlyBanner.innerHTML = `
           <div class="p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-emerald-950 shadow-xs">
             <div class="flex items-center gap-2.5">
@@ -2220,6 +2228,29 @@ class DisciplineApp {
               <button type="button" onclick="window.app.adminUnlockAllWeeks()" class="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold rounded-lg text-xs transition cursor-pointer flex items-center gap-1 shadow-xs" title="Mở khóa tất cả các tuần 1 đến 6">
                 <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
                 <span>Mở Khóa Toàn Bộ Tuần</span>
+              </button>
+              <button type="button" onclick="window.app.handleAuthButtonClick()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs transition cursor-pointer shadow-xs">
+                Đăng xuất
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        readonlyBanner.innerHTML = `
+          <div class="p-3 bg-indigo-50 border border-indigo-300 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-indigo-950 shadow-xs">
+            <div class="flex items-center gap-2.5">
+              <div class="w-7 h-7 rounded-lg bg-indigo-200/80 text-indigo-800 flex items-center justify-center flex-shrink-0 font-bold">
+                <i data-lucide="flag" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <p class="font-extrabold text-indigo-950">Quyền Giám Thị / Đội Cờ Đỏ Đang Hoạt Động</p>
+                <p class="text-[11px] text-indigo-800">Thầy/cô và ban nề nếp có quyền ghi nhận, chấm điểm vi phạm học sinh và cập nhật nề nếp thi đua.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button type="button" onclick="window.app.requireAdmin(() => {})" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs transition cursor-pointer flex items-center gap-1 shadow-xs" title="Nhập mật khẩu Admin để mở khóa các tính năng cấp cao">
+                <i data-lucide="key" class="w-3.5 h-3.5"></i>
+                <span>Nâng Quyền Admin</span>
               </button>
               <button type="button" onclick="window.app.handleAuthButtonClick()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg text-xs transition cursor-pointer shadow-xs">
                 Đăng xuất
@@ -3500,7 +3531,7 @@ class DisciplineApp {
   }
 
   renderSnapshotsList() {
-    const isAuth = this.isDataEntryUnlocked();
+    const isAuth = this.isAdmin();
     const container = document.getElementById('snapshots-list-container');
     const emptyState = document.getElementById('snapshots-empty-state');
     if (!container) return;
@@ -3705,7 +3736,7 @@ class DisciplineApp {
 
   confirmRestoreBackup() {
     const entered = (document.getElementById('input-backup-password').value || '').trim();
-    if (entered !== this.PASSWORD_CONFIG) {
+    if (entered !== this.PASSWORD_ADMIN) {
       document.getElementById('backup-password-error').classList.remove('hidden');
       return;
     }
@@ -3775,7 +3806,7 @@ class DisciplineApp {
   // ==================== QUẢN LÝ HỌC SINH (TAB 4 - NGUỒN MỞ) ====================
 
   renderStudentsTable() {
-    const isAuth = this.isDataEntryUnlocked();
+    const isAuth = this.isAdmin();
     const tbody = document.getElementById('students-table-body');
     const countSpan = document.getElementById('student-table-count');
     const searchVal = (document.getElementById('student-search-query').value || '').trim().toLowerCase();
@@ -4004,7 +4035,7 @@ class DisciplineApp {
   // ==================== QUẢN LÝ QUY ĐỊNH LỖI (TAB 5 - NGUỒN MỞ) ====================
 
   renderRulesTable() {
-    const isAuth = this.isDataEntryUnlocked();
+    const isAuth = this.isAdmin();
     const tbody = document.getElementById('rules-table-body');
     if (!tbody) return;
 
@@ -4286,8 +4317,11 @@ class DisciplineApp {
 
   handleAuthButtonClick() {
     if (this.isDataEntryUnlocked()) {
-      if (confirm('Bạn đang ở trạng thái Quản trị viên. Bạn có muốn đăng xuất để chuyển sang chế độ Chỉ xem (Read-only) không?')) {
+      const roleName = this.isAdmin() ? 'Quản trị viên Admin' : 'Giám thị / Đội Cờ đỏ';
+      if (confirm(`Bạn đang đăng nhập với quyền ${roleName}. Bạn có muốn đăng xuất để chuyển sang chế độ Chỉ xem (Read-only) không?`)) {
+        sessionStorage.removeItem('user_role');
         sessionStorage.removeItem('data_entry_unlocked');
+        localStorage.removeItem('user_role');
         localStorage.removeItem('data_entry_unlocked');
 
         // Khóa lại các tuần đã qua để đảm bảo an toàn sau khi đăng xuất
@@ -4300,15 +4334,33 @@ class DisciplineApp {
         }
 
         this.updateLockStatusUI();
-        this.showToast('Đã đăng xuất. Toàn bộ các mục quản trị đã được khóa an toàn (Chế độ Chỉ xem).', 'info');
+        this.showToast('Đã đăng xuất. Hệ thống đã chuyển về chế độ Chỉ xem an toàn.', 'info');
       }
     } else {
       this.openPasswordModal();
     }
   }
 
+  getUserRole() {
+    const role = sessionStorage.getItem('user_role');
+    if (role === 'admin' || role === 'supervisor') return role;
+    if (sessionStorage.getItem('data_entry_unlocked') === 'true') {
+      return 'admin';
+    }
+    return null;
+  }
+
+  isAdmin() {
+    return this.getUserRole() === 'admin';
+  }
+
+  isSupervisor() {
+    const role = this.getUserRole();
+    return role === 'admin' || role === 'supervisor';
+  }
+
   isDataEntryUnlocked() {
-    return sessionStorage.getItem('data_entry_unlocked') === 'true';
+    return this.isSupervisor();
   }
 
     updateLockStatusUI() {
@@ -4316,29 +4368,49 @@ class DisciplineApp {
     const icon = document.getElementById('lock-icon');
     const btn = document.getElementById('btn-toggle-auth-lock');
     const isUnlocked = this.isDataEntryUnlocked();
+    const isAdmin = this.isAdmin();
+    const isSupervisor = this.isSupervisor();
 
     if (text) {
-      text.textContent = isUnlocked ? '🔓 Quản trị Admin' : '🔒 Đăng nhập';
+      if (isAdmin) {
+        text.textContent = '🔓 Quản trị Admin';
+      } else if (isSupervisor) {
+        text.textContent = '🚩 Giám thị / Cờ đỏ';
+      } else {
+        text.textContent = '🔒 Đăng nhập';
+      }
     }
     if (icon) {
-      icon.setAttribute('data-lucide', isUnlocked ? 'unlock' : 'lock');
-      icon.setAttribute('class', isUnlocked ? 'w-4 h-4 text-emerald-400 pointer-events-none' : 'w-4 h-4 text-amber-400 pointer-events-none');
+      if (isAdmin) {
+        icon.setAttribute('data-lucide', 'unlock');
+        icon.setAttribute('class', 'w-4 h-4 text-emerald-400 pointer-events-none');
+      } else if (isSupervisor) {
+        icon.setAttribute('data-lucide', 'shield-check');
+        icon.setAttribute('class', 'w-4 h-4 text-indigo-300 pointer-events-none');
+      } else {
+        icon.setAttribute('data-lucide', 'lock');
+        icon.setAttribute('class', 'w-4 h-4 text-amber-400 pointer-events-none');
+      }
     }
     if (btn) {
-      btn.className = isUnlocked 
-        ? 'flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer'
-        : 'flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer';
+      if (isAdmin) {
+        btn.className = 'flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer';
+      } else if (isSupervisor) {
+        btn.className = 'flex items-center gap-1.5 bg-indigo-700 hover:bg-indigo-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer';
+      } else {
+        btn.className = 'flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer';
+      }
     }
 
-    // 1. Cập nhật các badge khóa trên thanh điều hướng tab
+    // 1. Cập nhật các badge khóa trên thanh điều hướng tab: CHỈ ẨN KHI LÀ ADMIN
     ['tab-students', 'tab-rules', 'tab-backup'].forEach(tabId => {
       const lockBadge = document.getElementById(`lock-badge-${tabId}`);
       if (lockBadge) {
-        lockBadge.style.display = isUnlocked ? 'none' : 'inline-flex';
+        lockBadge.style.display = isAdmin ? 'none' : 'inline-flex';
       }
     });
 
-    // 2. Tab 1: Vô hiệu hóa nút Thêm lỗi & Chạy AI khi chưa đăng nhập
+    // 2. Tab 1: Nút Thêm lỗi & Chạy AI: Mở cho CẢ Admin VÀ Giám thị / Cờ đỏ
     const btnManualAdd = document.getElementById('btn-manual-add');
     if (btnManualAdd) {
       if (isUnlocked) {
@@ -4365,7 +4437,7 @@ class DisciplineApp {
       }
     }
 
-    // 3. Tab 3: Ẩn hoặc Hiện toàn bộ các nút Thêm / Sửa / Khóa tuần
+    // 3. Tab 3: Thao tác Bảng Thi Đua
     const btnAddBonus = document.getElementById('btn-add-bonus-point');
     const btnImport = document.getElementById('btn-open-excel-import');
     const btnSaveTable = document.getElementById('btn-save-emulation-table');
@@ -4376,26 +4448,27 @@ class DisciplineApp {
     if (btnAddBonus) btnAddBonus.style.display = isUnlocked ? 'inline-flex' : 'none';
     if (btnImport) btnImport.style.display = isUnlocked ? 'inline-flex' : 'none';
     if (btnSaveTable) btnSaveTable.style.display = isUnlocked ? 'inline-flex' : 'none';
-    if (btnToggleWeekLock) btnToggleWeekLock.style.display = isUnlocked ? 'inline-flex' : 'none';
-    if (btnUnlockAllWeeks) btnUnlockAllWeeks.style.display = isUnlocked ? 'inline-flex' : 'none';
-    if (btnManageWeeks) btnManageWeeks.style.display = isUnlocked ? 'inline-flex' : 'none';
+    // Các nút can thiệp khóa tuần chỉ dành riêng cho Admin cấp cao
+    if (btnToggleWeekLock) btnToggleWeekLock.style.display = isAdmin ? 'inline-flex' : 'none';
+    if (btnUnlockAllWeeks) btnUnlockAllWeeks.style.display = isAdmin ? 'inline-flex' : 'none';
+    if (btnManageWeeks) btnManageWeeks.style.display = isAdmin ? 'inline-flex' : 'none';
 
-    // 4. Tab 4: Ẩn / Hiện nút Thêm / Import học sinh
+    // 4. Tab 4: Ẩn / Hiện nút Thêm / Import học sinh: CHỈ DÀNH CHO ADMIN
     ['btn-open-add-student', 'btn-open-import-students', 'btn-reset-default-students'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.style.display = isUnlocked ? 'inline-flex' : 'none';
+      if (el) el.style.display = isAdmin ? 'inline-flex' : 'none';
     });
 
-    // 5. Tab 5: Ẩn / Hiện nút Thêm / Reset nội quy
+    // 5. Tab 5: Ẩn / Hiện nút Thêm / Reset nội quy: CHỈ DÀNH CHO ADMIN
     ['btn-open-add-rule', 'btn-reset-default-rules'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.style.display = isUnlocked ? 'inline-flex' : 'none';
+      if (el) el.style.display = isAdmin ? 'inline-flex' : 'none';
     });
 
-    // 6. Tab 6: Ẩn / Hiện nút Tạo điểm khôi phục / Reset
+    // 6. Tab 6: Ẩn / Hiện nút Tạo điểm khôi phục / Reset: CHỈ DÀNH CHO ADMIN
     ['btn-open-create-snapshot', 'btn-trigger-snapshot-modal', 'btn-clear-all-snapshots'].forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.style.display = isUnlocked ? 'inline-flex' : 'none';
+      if (el) el.style.display = isAdmin ? 'inline-flex' : 'none';
     });
 
     // Cập nhật lại toàn bộ bảng biểu để ẩn/hiện các nút Thao tác Sửa / Xóa
@@ -4464,23 +4537,53 @@ class DisciplineApp {
     const input = document.getElementById('login-password');
     const err = document.getElementById('password-error-msg');
     const entered = (input ? input.value : '').trim();
+    const enteredLower = entered.toLowerCase();
 
-    if (entered === this.PASSWORD_CONFIG) {
+    const isAdminPass = entered === this.PASSWORD_ADMIN;
+    const isSupervisorPass = enteredLower === this.PASSWORD_SUPERVISOR.toLowerCase();
+
+    // Nếu hành động đang yêu cầu quyền Admin cấp cao (ví dụ mở tab nhạy cảm)
+    if (this.currentModalRequireAdmin && !isAdminPass) {
+      if (isSupervisorPass) {
+        if (err) {
+          err.textContent = 'Mục này yêu cầu quyền Admin cấp cao! Mật khẩu Giám thị / Cờ đỏ không thể truy cập.';
+          err.classList.remove('hidden');
+          err.style.display = 'block';
+        }
+        if (input) {
+          input.classList.remove('border-slate-300');
+          input.classList.add('border-red-500', 'bg-red-50');
+          input.select();
+          input.focus();
+        }
+        this.showToast('Mục này yêu cầu quyền Quản trị Admin cấp cao.', 'error');
+        return;
+      }
+    }
+
+    if (isAdminPass || isSupervisorPass) {
       try {
+        const role = isAdminPass ? 'admin' : 'supervisor';
+        sessionStorage.setItem('user_role', role);
         sessionStorage.setItem('data_entry_unlocked', 'true');
-        
-        // 1. Mở khóa toàn bộ các tuần (Tuần 1 đến 6) theo đặc quyền Admin
-        this.lockedWeeks = [];
-        this.saveLockedWeeks();
 
-        // 2. Tự động đóng hộp thoại đăng nhập ngay lập tức
+        if (isAdminPass) {
+          // Mở khóa toàn bộ các tuần (Tuần 1 đến 6) theo đặc quyền Admin
+          this.lockedWeeks = [];
+          this.saveLockedWeeks();
+        }
+
+        // Đóng modal đăng nhập
         this.closePasswordModal();
 
-        // 3. Cập nhật giao diện mở khóa
+        // Cập nhật giao diện
         this.updateLockStatusUI();
-        
-        // 4. Hiển thị thông báo thành công
-        this.showToast('Quyền Admin: Đăng nhập thành công! Đã cấp quyền và mở khóa toàn bộ các tuần (Tuần 1 - 6) để chỉnh sửa.', 'success');
+
+        if (isAdminPass) {
+          this.showToast('🔓 Quyền Admin: Đăng nhập thành công! Đã cấp quyền quản trị cấp cao và mở khóa toàn bộ các tuần.', 'success');
+        } else {
+          this.showToast('🚩 Quyền Giám Thị / Cờ Đỏ: Đăng nhập thành công! Thầy/cô và ban nề nếp có thể ghi nhận vi phạm.', 'success');
+        }
 
         if (typeof this.pendingAction === 'function') {
           const action = this.pendingAction;
@@ -4491,9 +4594,8 @@ class DisciplineApp {
         console.error('LỖI trong submitPassword:', err);
       }
     } else {
-      // 3. Nếu sai mật khẩu, hiển thị thông báo "Đăng nhập không thành công!" trực tiếp trên modal
       if (err) {
-        err.textContent = 'Đăng nhập không thành công!';
+        err.textContent = 'Mật khẩu không chính xác! Vui lòng thử lại.';
         err.classList.remove('hidden');
         err.style.display = 'block';
       }
@@ -4503,7 +4605,15 @@ class DisciplineApp {
         input.select();
         input.focus();
       }
-      this.showToast('Đăng nhập không thành công! Vui lòng thử lại.', 'error');
+      this.showToast('Mật khẩu không chính xác! Vui lòng thử lại.', 'error');
+    }
+  }
+
+  requireAdmin(onSuccess) {
+    if (this.isAdmin()) {
+      if (typeof onSuccess === 'function') onSuccess();
+    } else {
+      this.openPasswordModal(onSuccess, true);
     }
   }
 
@@ -4511,7 +4621,7 @@ class DisciplineApp {
     if (this.isDataEntryUnlocked()) {
       if (typeof onSuccess === 'function') onSuccess();
     } else {
-      this.openPasswordModal(onSuccess);
+      this.openPasswordModal(onSuccess, false);
     }
   }
 
