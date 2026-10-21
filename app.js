@@ -221,7 +221,7 @@ class DisciplineApp {
       this.saveLockedWeeks();
       this.renderManageWeeksList();
       this.renderEmulationTable();
-      this.showToast('Quyền Admin (2806): Đã mở khóa toàn bộ các tuần (Tuần 01 đến Tuần 06)! Thầy/cô có thể chỉnh sửa dữ liệu của tất cả các tuần.', 'success');
+      this.showToast('Quyền Admin: Đã mở khóa toàn bộ các tuần (Tuần 01 đến Tuần 06)! Thầy/cô có thể chỉnh sửa dữ liệu của tất cả các tuần.', 'success');
     });
   }
 
@@ -232,7 +232,7 @@ class DisciplineApp {
       this.saveLockedWeeks();
       this.renderManageWeeksList();
       this.renderEmulationTable();
-      this.showToast(`Quyền Admin (2806): Đã mở khóa Tuần ${w} thành công! Thầy/cô có thể chỉnh sửa dữ liệu tuần này.`, 'success');
+      this.showToast(`Quyền Admin: Đã mở khóa Tuần ${w} thành công! Thầy/cô có thể chỉnh sửa dữ liệu tuần này.`, 'success');
     });
   }
 
@@ -297,7 +297,7 @@ class DisciplineApp {
         : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300"><i data-lucide="unlock" class="w-3 h-3 text-emerald-600"></i> Đang mở</span>`;
 
       const actionBtn = isLocked
-        ? `<button onclick="window.app.adminUnlockSpecificWeek(${w})" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs transition cursor-pointer shadow-xs flex items-center justify-center gap-1 mx-auto"><i data-lucide="unlock" class="w-3 h-3"></i> Mở khóa (2806)</button>`
+        ? `<button onclick="window.app.adminUnlockSpecificWeek(${w})" class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold text-xs transition cursor-pointer shadow-xs flex items-center justify-center gap-1 mx-auto"><i data-lucide="unlock" class="w-3 h-3"></i> Mở khóa</button>`
         : `<button onclick="window.app.lockSpecificWeek(${w})" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-800 text-slate-100 rounded-lg font-bold text-xs transition cursor-pointer shadow-xs flex items-center justify-center gap-1 mx-auto"><i data-lucide="lock" class="w-3 h-3"></i> Khóa lại</button>`;
 
       const rowBg = isCur ? 'bg-blue-50/60 font-semibold' : 'hover:bg-slate-50';
@@ -541,7 +541,7 @@ class DisciplineApp {
       else if (targetTab === 'tab-rules') tabName = 'Danh Mục Lỗi & Điểm';
       else if (targetTab === 'tab-backup') tabName = 'Sao Lưu & Bảo Vệ Dữ Liệu';
 
-      this.showToast(`🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin. Vui lòng nhập mật khẩu (2806) để truy cập!`, 'warning');
+      this.showToast(`🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin. Vui lòng nhập mật khẩu quản trị để truy cập!`, 'warning');
       this.openPasswordModal(() => {
         this.switchTab(targetTab);
       });
@@ -2183,7 +2183,7 @@ class DisciplineApp {
     const isAuth = this.isDataEntryUnlocked();
     const canEdit = isAuth && !isLocked;
 
-    // 1. Cập nhật Banner Chế độ Bảo mật (Chỉ xem) vs Quyền Admin (2806)
+    // 1. Cập nhật Banner Chế độ Bảo mật (Chỉ xem) vs Quyền Admin
     const readonlyBanner = document.getElementById('emulation-readonly-banner');
     if (readonlyBanner) {
       if (!isAuth) {
@@ -2200,7 +2200,7 @@ class DisciplineApp {
             </div>
             <button type="button" onclick="window.app.openPasswordModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold rounded-xl text-xs transition cursor-pointer flex-shrink-0 flex items-center justify-center gap-1.5 shadow-xs">
               <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
-              <span>Đăng nhập Admin (2806)</span>
+              <span>Đăng nhập Admin</span>
             </button>
           </div>
         `;
@@ -2212,7 +2212,7 @@ class DisciplineApp {
                 <i data-lucide="shield-check" class="w-4 h-4"></i>
               </div>
               <div>
-                <p class="font-extrabold text-emerald-950">Quyền Quản Trị Cấp Cao Đang Kích Hoạt (Mật khẩu Admin 2806)</p>
+                <p class="font-extrabold text-emerald-950">Quyền Quản Trị Cấp Cao Đang Kích Hoạt (Admin)</p>
                 <p class="text-[11px] text-emerald-800">Thầy/cô có toàn quyền Thêm, Sửa, Xóa, Nhập điểm trực tiếp, Import file và Mở khóa toàn bộ các tuần (1 đến 6).</p>
               </div>
             </div>
@@ -2248,7 +2248,7 @@ class DisciplineApp {
       if (isLocked) {
         btnToggleLock.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition shadow-xs cursor-pointer border border-amber-600';
         btnToggleLock.innerHTML = `<i data-lucide="unlock" class="w-3.5 h-3.5"></i><span>Mở Khóa Tuần (Admin)</span>`;
-        btnToggleLock.title = 'Quyền Admin (2806): Mở khóa tuần này để chỉnh sửa dữ liệu';
+        btnToggleLock.title = 'Quyền Admin: Mở khóa tuần này để chỉnh sửa dữ liệu';
       } else {
         btnToggleLock.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-700 hover:bg-slate-800 text-slate-100 transition shadow-xs cursor-pointer border border-slate-600';
         btnToggleLock.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5"></i><span>Khóa Tuần Này</span>`;
@@ -2354,7 +2354,7 @@ class DisciplineApp {
         actionCol = `
           <button type="button" onclick="window.app.requirePassword(() => window.app.openEditClassModal(${selectedWeek}, '${r.className}'))"
                   class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
-                  title="Cần đăng nhập Admin (2806) để sửa">
+                  title="Cần đăng nhập Admin để sửa">
             <i data-lucide="lock" class="w-3 h-3 text-amber-500"></i>
             <span>Chỉ xem</span>
           </button>
@@ -2564,7 +2564,7 @@ class DisciplineApp {
 
   handleInlineEmulationChange(weekNum, className, field, value) {
     if (!this.isDataEntryUnlocked()) {
-      this.showToast('Bạn đang ở chế độ Chỉ xem. Vui lòng đăng nhập Admin (2806) để chỉnh sửa!', 'warning');
+      this.showToast('Bạn đang ở chế độ Chỉ xem. Vui lòng đăng nhập Admin để chỉnh sửa!', 'warning');
       this.openPasswordModal();
       this.renderEmulationTable();
       return;
@@ -4217,7 +4217,7 @@ class DisciplineApp {
     }
   }
 
-  // ==================== BẢO VỆ MẬT KHẨU NHẬP LIỆU (2806) ====================
+  // ==================== BẢO VỆ MẬT KHẨU QUẢN TRỊ ====================
 
   setupPasswordAuth() {
     this.PASSWORD_CONFIG = "2806";
@@ -4469,7 +4469,7 @@ class DisciplineApp {
       try {
         sessionStorage.setItem('data_entry_unlocked', 'true');
         
-        // 1. Mở khóa toàn bộ các tuần (Tuần 1 đến 6) theo đặc quyền Admin 2806
+        // 1. Mở khóa toàn bộ các tuần (Tuần 1 đến 6) theo đặc quyền Admin
         this.lockedWeeks = [];
         this.saveLockedWeeks();
 
@@ -4480,7 +4480,7 @@ class DisciplineApp {
         this.updateLockStatusUI();
         
         // 4. Hiển thị thông báo thành công
-        this.showToast('Quyền Admin (2806): Đăng nhập thành công! Đã cấp quyền và mở khóa toàn bộ các tuần (Tuần 1 - 6) để chỉnh sửa.', 'success');
+        this.showToast('Quyền Admin: Đăng nhập thành công! Đã cấp quyền và mở khóa toàn bộ các tuần (Tuần 1 - 6) để chỉnh sửa.', 'success');
 
         if (typeof this.pendingAction === 'function') {
           const action = this.pendingAction;

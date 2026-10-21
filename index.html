@@ -517,7 +517,7 @@
           </div>
 
           <!-- Nút Admin Mở Khóa / Khóa Tuần Hiện Tại -->
-          <button id="btn-toggle-week-lock" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-xs cursor-pointer border bg-amber-500 hover:bg-amber-600 text-white" title="Quyền Admin (2806): Khóa hoặc Mở khóa tuần này để chỉnh sửa">
+          <button id="btn-toggle-week-lock" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-xs cursor-pointer border bg-amber-500 hover:bg-amber-600 text-white" title="Quyền Admin: Khóa hoặc Mở khóa tuần này để chỉnh sửa">
             <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
             <span>Mở Khóa Tuần (Admin)</span>
           </button>
@@ -529,7 +529,7 @@
           </button>
 
           <!-- Nút Admin Mở Khóa Toàn Bộ Các Tuần (Tuần 1 - 6) -->
-          <button id="btn-unlock-all-weeks" onclick="window.app.adminUnlockAllWeeks()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white transition shadow-xs cursor-pointer border border-amber-700" title="Quyền Admin (2806): Mở khóa toàn bộ các tuần (Tuần 1 đến Tuần 6) để quản trị viên chỉnh sửa">
+          <button id="btn-unlock-all-weeks" onclick="window.app.adminUnlockAllWeeks()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white transition shadow-xs cursor-pointer border border-amber-700" title="Quyền Admin: Mở khóa toàn bộ các tuần (Tuần 1 đến Tuần 6) để quản trị viên chỉnh sửa">
             <i data-lucide="unlock" class="w-3.5 h-3.5 text-amber-200"></i>
             <span class="font-extrabold">Mở Khóa Toàn Bộ Tuần</span>
           </button>
@@ -1481,7 +1481,7 @@
   </div>
 
     <!-- ================================================================ -->
-  <!-- MODAL: XÁC THỰC MẬT KHẨU NHẬP LIỆU (2806)                      -->
+  <!-- MODAL: XÁC THỰC MẬT KHẨU QUẢN TRỊ                               -->
   <!-- ================================================================ -->
   <div id="modal-login-password" 
        class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
@@ -1787,7 +1787,7 @@
 
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mật khẩu quản trị:</label>
-          <input type="password" id="input-backup-password" placeholder="Nhập mật khẩu (2806)..."
+          <input type="password" id="input-backup-password" placeholder="Nhập mật khẩu quản trị..." autocomplete="new-password"
                  class="w-full text-center text-sm font-mono tracking-widest p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
           <p id="backup-password-error" class="hidden text-xs text-rose-600 font-bold mt-1">Mật khẩu quản trị không chính xác!</p>
         </div>
@@ -1896,7 +1896,7 @@
   </div>
 
   <!-- ================================================================ -->
-  <!-- MODAL: QUẢN LÝ KHÓA / MỞ CÁC TUẦN THI ĐUA (Admin 2806)          -->
+  <!-- MODAL: QUẢN LÝ KHÓA / MỞ CÁC TUẦN THI ĐUA (Admin)                   -->
   <!-- ================================================================ -->
   <div id="modal-manage-weeks" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col animate-scale-up">
@@ -1907,7 +1907,7 @@
           </div>
           <div>
             <h3 class="font-extrabold text-slate-900 text-base">Quản Lý Khóa & Mở Tuần Thi Đua (Admin)</h3>
-            <p class="text-xs text-slate-500">Mật khẩu xác thực quyền quản trị: <strong class="text-amber-700 font-mono">2806</strong></p>
+            <p class="text-xs text-slate-500">Phân quyền Quản trị viên cấp cao (Admin)</p>
           </div>
         </div>
         <button id="btn-close-manage-weeks-modal" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-100 transition cursor-pointer">
