@@ -592,10 +592,16 @@ class DisciplineApp {
       localStorage.setItem('gemini_api_key', DEFAULT_API_KEY);
     }
 
-    // 2. Migration: Nếu URL cũ là kvdb.io (không còn dùng), tự động chuyển sang GAS mới
+    // 2. Migration: Tự động cập nhật URL Google Apps Script chính thức mới nhất
     const savedUrl = localStorage.getItem('dshs_cloud_url');
-    if (!savedUrl || savedUrl.includes('kvdb.io')) {
-      localStorage.removeItem('dshs_cloud_url'); // Xóa URL cũ, dùng DEFAULT_CLOUD_URL (GAS)
+    if (!savedUrl || savedUrl.includes('kvdb.io') || !savedUrl.includes('AKfycbwQxI054Rt_')) {
+      localStorage.setItem('dshs_cloud_url', this.DEFAULT_CLOUD_URL);
+    }
+
+    // Luôn cập nhật sẵn URL vào ô input Cài đặt để hiển thị ngay lập tức
+    const inputCloudUrl = document.getElementById('input-cloud-url');
+    if (inputCloudUrl) {
+      inputCloudUrl.value = this.getCloudUrl();
     }
 
     this.setupDateAndTime();
@@ -4794,9 +4800,9 @@ class DisciplineApp {
   }
 
   getUserRole() {
-    const role = sessionStorage.getItem('user_role');
+    const role = sessionStorage.getItem('user_role') || localStorage.getItem('user_role');
     if (role === 'admin' || role === 'supervisor') return role;
-    if (sessionStorage.getItem('data_entry_unlocked') === 'true') {
+    if (sessionStorage.getItem('data_entry_unlocked') === 'true' || localStorage.getItem('data_entry_unlocked') === 'true') {
       return 'admin';
     }
     return null;
@@ -5050,6 +5056,8 @@ class DisciplineApp {
         const role = isAdminPass ? 'admin' : 'supervisor';
         sessionStorage.setItem('user_role', role);
         sessionStorage.setItem('data_entry_unlocked', 'true');
+        localStorage.setItem('user_role', role);
+        localStorage.setItem('data_entry_unlocked', 'true');
 
         if (isAdminPass) {
           // Mở khóa toàn bộ các tuần (Tuần 1 đến 6) theo đặc quyền Admin
@@ -5207,6 +5215,11 @@ class DisciplineApp {
   }
 
   async pushToCloud(silent = true) {
+    // Dual-Storage: Chỉ Admin hoặc thiết bị có quyền (Supervisor/Admin) mới được phép gọi POST ghi đè lên Google Sheets
+    if (!this.isAdmin() && !this.isSupervisor()) {
+      return false; // Máy khách / điện thoại chỉ xem dữ liệu, tuyệt đối không đẩy đè lên Cloud
+    }
+
     const cloudUrl = this.getCloudUrl();
     if (!cloudUrl) return false;
 
@@ -5259,6 +5272,7 @@ class DisciplineApp {
 
       if (res.ok) {
         localStorage.setItem('dshs_last_sync_time', new Date().toISOString());
+        localStorage.setItem('dshs_last_push_time', new Date().toISOString());
         this.updateCloudStatusBadge(true);
         if (!silent) {
           const targetName = isGAS ? 'Google Sheets' : 'Cloud';
@@ -5282,7 +5296,6 @@ class DisciplineApp {
     if (!cloudUrl) return false;
 
     // Giới hạn tần suất gọi tối thiểu 3 giây giữa các lần để tránh nghẽn mạng
-    // (giá trị tăng từ 2s → 3s cho phù hợp với polling 10s mới)
     const now = Date.now();
     if (this._lastPullTime && (now - this._lastPullTime < 3000)) {
       return false;
@@ -5313,7 +5326,7 @@ class DisciplineApp {
         data = jsonResp.data;
       }
 
-      let cloudViolations = [];
+      let cloudViolations = null;
       let cloudDeletedIds = [];
       let cloudEmulationWeeks = null;
       let cloudBonusPoints = null;
@@ -5332,12 +5345,64 @@ class DisciplineApp {
           if (data.bonus_points && typeof data.bonus_points === 'object') {
             cloudBonusPoints = data.bonus_points;
           }
-        } else {
-          cloudViolations = Object.values(data);
+        } else if (data.violations && typeof data.violations === 'object') {
+          cloudViolations = Object.values(data.violations);
         }
       }
 
-      // 1. Đồng bộ danh sách ID đã xóa từ Cloud về máy này
+      // Kiểm tra xem thiết bị hiện tại có quyền Admin/Supervisor hay là thiết bị khách (điện thoại/máy xem)
+      const isPrivilegedDevice = this.isAdmin() || this.isSupervisor();
+
+      // =========================================================================
+      // TRƯỜNG HỢP 1: THIẾT BỊ KHÁCH / ĐIỆN THOẠI (Không phải máy Admin)
+      // Tải trực tiếp dữ liệu từ Google Sheets (đám mây) để đảm bảo luôn nhận được
+      // số liệu mới nhất mà KHÔNG bị phụ thuộc vào localStorage của máy khác
+      // =========================================================================
+      if (!isPrivilegedDevice) {
+        let hasUpdated = false;
+
+        if (Array.isArray(cloudViolations)) {
+          this.violations = this.sortViolations(cloudViolations);
+          localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+          hasUpdated = true;
+        }
+
+        if (Array.isArray(cloudDeletedIds)) {
+          this.deletedViolationIds = new Set(cloudDeletedIds.map(String));
+          localStorage.setItem('dshs_deleted_violations_ids', JSON.stringify(Array.from(this.deletedViolationIds)));
+        }
+
+        if (cloudEmulationWeeks && typeof cloudEmulationWeeks === 'object' && Object.keys(cloudEmulationWeeks).length > 0) {
+          this.emulationWeeks = cloudEmulationWeeks;
+          localStorage.setItem('dshs_emulation_weeks', JSON.stringify(this.emulationWeeks));
+          hasUpdated = true;
+        }
+
+        if (cloudBonusPoints && typeof cloudBonusPoints === 'object') {
+          this.bonusPoints = cloudBonusPoints;
+          localStorage.setItem('dshs_bonus_points', JSON.stringify(this.bonusPoints));
+          hasUpdated = true;
+        }
+
+        // Cập nhật lại toàn bộ giao diện theo số liệu mới nhất từ Google Sheets
+        this.updateBadges();
+        this.renderLogsTable();
+        this.renderEmulationTable();
+        this.updateCharts();
+
+        localStorage.setItem('dshs_last_sync_time', new Date().toISOString());
+        this.updateCloudStatusBadge(true);
+        // Tuyệt đối không gọi pushToCloud() từ thiết bị khách
+        return true;
+      }
+
+      // =========================================================================
+      // TRƯỜNG HỢP 2: MÁY ADMIN (Thiết bị có quyền)
+      // Ưu tiên tải dữ liệu từ Google Sheets mới nhất về, đồng thời cập nhật ngược lại
+      // vào localStorage để làm bộ nhớ đệm (cache) giúp web chạy mượt mà ngay cả khi mạng chậm
+      // =========================================================================
+
+      // 1. Đồng bộ danh sách ID đã xóa từ Cloud về máy Admin
       if (cloudDeletedIds.length > 0) {
         if (!this.deletedViolationIds) this.deletedViolationIds = new Set();
         cloudDeletedIds.forEach(id => {
@@ -5346,11 +5411,11 @@ class DisciplineApp {
         localStorage.setItem('dshs_deleted_violations_ids', JSON.stringify(Array.from(this.deletedViolationIds)));
       }
 
-      // 2. Lọc bỏ các bản ghi cục bộ nếu đã bị xóa trên thiết bị khác
+      // 2. Lọc bỏ các bản ghi cục bộ nếu đã bị xóa trên Cloud
       const initialCount = this.violations.length;
       this.violations = this.violations.filter(v => v && v.id && !this.deletedViolationIds.has(String(v.id)));
 
-      // 3. Nạp danh sách vi phạm cục bộ hiện hành (bỏ qua những id đã bị xóa)
+      // 3. Nạp danh sách vi phạm cục bộ hiện hành
       const localMap = new Map();
       this.violations.forEach(v => {
         if (v && v.id && !this.deletedViolationIds.has(String(v.id))) {
@@ -5358,27 +5423,40 @@ class DisciplineApp {
         }
       });
 
-      let hasNewFromCloud = false;
+      let dataChanged = false;
 
-      // 4. Hợp nhất dữ liệu mới từ Cloud (từ các thiết bị khác như điện thoại)
-      cloudViolations.forEach(cv => {
-        if (cv && cv.id && !this.deletedViolationIds.has(String(cv.id))) {
-          if (!localMap.has(String(cv.id))) {
-            localMap.set(String(cv.id), cv);
-            hasNewFromCloud = true;
+      // 4. Hợp nhất dữ liệu mới từ Cloud (kể cả thêm mới lẫn cập nhật nội dung đã sửa đổi)
+      if (Array.isArray(cloudViolations)) {
+        cloudViolations.forEach(cv => {
+          if (cv && cv.id && !this.deletedViolationIds.has(String(cv.id))) {
+            const idStr = String(cv.id);
+            const localItem = localMap.get(idStr);
+            if (!localItem) {
+              localMap.set(idStr, cv);
+              dataChanged = true;
+            } else {
+              // Cập nhật nội dung nếu bản ghi trên Cloud có thay đổi
+              if (JSON.stringify(localItem) !== JSON.stringify(cv)) {
+                localMap.set(idStr, cv);
+                dataChanged = true;
+              }
+            }
           }
-        }
-      });
+        });
+      }
 
-      // 5. Sắp xếp lại danh sách hợp nhất theo thứ tự thời gian/ID và lớp A -> Z
+      // Sắp xếp lại danh sách hợp nhất theo thứ tự thời gian/ID và lớp A -> Z
       const mergedList = this.sortViolations(Array.from(localMap.values()));
-
       const oldCount = this.violations.length;
-      let dataChanged = hasNewFromCloud || (initialCount !== oldCount) || (mergedList.length !== oldCount);
+      if (initialCount !== oldCount || mergedList.length !== oldCount) {
+        dataChanged = true;
+      }
       this.violations = mergedList;
+
+      // Cập nhật ngược lại vào localStorage để làm bộ nhớ đệm (cache) cho máy Admin
       localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
 
-      // 6. Hợp nhất Emulation Weeks nếu có từ Cloud
+      // 5. Hợp nhất Bảng thi đua nếu có từ Cloud
       if (cloudEmulationWeeks && typeof cloudEmulationWeeks === 'object') {
         Object.keys(cloudEmulationWeeks).forEach(wKey => {
           const w = parseInt(wKey, 10);
@@ -5390,7 +5468,7 @@ class DisciplineApp {
               const cloudClasses = cloudEmulationWeeks[wKey].classes || {};
               const localClasses = this.emulationWeeks[w].classes || {};
               Object.keys(cloudClasses).forEach(cName => {
-                if (!localClasses[cName]) {
+                if (!localClasses[cName] || JSON.stringify(localClasses[cName]) !== JSON.stringify(cloudClasses[cName])) {
                   localClasses[cName] = cloudClasses[cName];
                   dataChanged = true;
                 }
@@ -5401,13 +5479,12 @@ class DisciplineApp {
         localStorage.setItem('dshs_emulation_weeks', JSON.stringify(this.emulationWeeks));
       }
 
-      // 7. Hợp nhất Bonus Points nếu có từ Cloud
+      // 6. Hợp nhất Điểm cộng nếu có từ Cloud
       if (cloudBonusPoints && typeof cloudBonusPoints === 'object') {
-        let bonusChanged = false;
         Object.keys(cloudBonusPoints).forEach(wKey => {
           if (!this.bonusPoints[wKey]) {
             this.bonusPoints[wKey] = cloudBonusPoints[wKey];
-            bonusChanged = true;
+            dataChanged = true;
           } else {
             const existingIds = new Set(this.bonusPoints[wKey].map(b => String(b.id || b.timestamp || '')));
             (cloudBonusPoints[wKey] || []).forEach(cb => {
@@ -5415,15 +5492,12 @@ class DisciplineApp {
               if (bId && !existingIds.has(bId)) {
                 this.bonusPoints[wKey].push(cb);
                 existingIds.add(bId);
-                bonusChanged = true;
+                dataChanged = true;
               }
             });
           }
         });
-        if (bonusChanged) {
-          localStorage.setItem('dshs_bonus_points', JSON.stringify(this.bonusPoints));
-          dataChanged = true;
-        }
+        localStorage.setItem('dshs_bonus_points', JSON.stringify(this.bonusPoints));
       }
 
       this.updateBadges();
@@ -5432,8 +5506,6 @@ class DisciplineApp {
         this.renderLogsTable();
         this.renderEmulationTable();
         this.updateCharts();
-        // Đẩy lại toàn bộ danh sách hợp nhất lên Cloud để 2 bên đồng nhất 100%
-        this.pushToCloud(true);
       }
 
       localStorage.setItem('dshs_last_sync_time', new Date().toISOString());
@@ -5461,21 +5533,24 @@ class DisciplineApp {
     try {
       const pullSuccess = await this.pullAndMergeFromCloud(silent);
       if (pullSuccess) {
-        await this.pushToCloud(true);
         if (!silent) {
           const isGAS = this.getCloudUrl().includes('script.google.com');
           const name = isGAS ? 'Google Sheets' : 'Cloud';
           this.showToast(`Đồng bộ ${name} thành công! Có ${this.violations.length} bản ghi vi phạm được bảo vệ an toàn.`, 'success');
         }
       } else {
-        // Nếu không kéo được, thử đẩy dữ liệu hiện có lên cloud
-        const pushSuccess = await this.pushToCloud(true);
-        if (pushSuccess && !silent) {
-          const isGAS = this.getCloudUrl().includes('script.google.com');
-          const name = isGAS ? 'Google Sheets' : 'Cloud';
-          this.showToast(`Đã đồng bộ ${this.violations.length} bản ghi vi phạm lên ${name}!`, 'success');
+        // Nếu không kéo được (ví dụ offline), chỉ máy Admin mới thử đẩy dữ liệu lên Cloud
+        if (this.isAdmin() || this.isSupervisor()) {
+          const pushSuccess = await this.pushToCloud(true);
+          if (pushSuccess && !silent) {
+            const isGAS = this.getCloudUrl().includes('script.google.com');
+            const name = isGAS ? 'Google Sheets' : 'Cloud';
+            this.showToast(`Đã đồng bộ ${this.violations.length} bản ghi vi phạm lên ${name}!`, 'success');
+          } else if (!silent) {
+            this.showToast('Không thể kết nối Cloud. Đang hoạt động Offline (Dữ liệu đã lưu an toàn trên máy).', 'warning');
+          }
         } else if (!silent) {
-          this.showToast('Không thể kết nối Cloud. Đang hoạt động Offline (Dữ liệu đã lưu an toàn trên máy).', 'warning');
+          this.showToast('Đang xem dữ liệu ngoại tuyến (Offline).', 'info');
         }
       }
     } catch (err) {
@@ -5488,6 +5563,9 @@ class DisciplineApp {
       if (btn) btn.classList.remove('opacity-75');
       if (icon) icon.classList.remove('animate-spin');
       if (text) text.textContent = 'Đồng bộ Cloud';
+      this.updateCloudStatusBadge(true);
+    }
+  }
       this.updateCloudStatusBadge(true);
     }
   }
