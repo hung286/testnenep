@@ -135,17 +135,20 @@
           <i data-lucide="users" class="w-4 h-4"></i>
           <span>Quản Lý Học Sinh</span>
           <span id="badge-total-students" class="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-bold">1226</span>
+          <span id="lock-badge-tab-students" class="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">🔒 Admin</span>
         </button>
 
         <button data-tab="tab-rules" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
           <i data-lucide="book-open" class="w-4 h-4"></i>
           <span>Danh Mục Lỗi & Điểm</span>
           <span id="badge-total-rules" class="bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 rounded-full font-bold">33</span>
+          <span id="lock-badge-tab-rules" class="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">🔒 Admin</span>
         </button>
 
         <button data-tab="tab-backup" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
           <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
           <span>Sao Lưu & Bảo Vệ Dữ Liệu</span>
+          <span id="lock-badge-tab-backup" class="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">🔒 Admin</span>
         </button>
 
       </div>
@@ -1490,8 +1493,8 @@
 
         <div class="relative mb-2">
           <input type="password" id="login-password" 
-                 name="lhp_otp_token"
-                 autocomplete="off"
+                 name="lhp_admin_auth_code"
+                 autocomplete="new-password"
                  autocorrect="off"
                  autocapitalize="off"
                  spellcheck="false"

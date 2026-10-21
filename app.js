@@ -66,21 +66,36 @@ class DisciplineApp {
   }
 
   loadViolations() {
+    let violations = [];
     const saved = localStorage.getItem('dshs_violations');
     if (saved) {
       try { 
-        const parsed = JSON.parse(saved);
+        violations = JSON.parse(saved);
         // Tự động làm sạch lỗi thừa chữ " - Lớp" nếu có trong dữ liệu cũ
-        parsed.forEach(v => {
+        violations.forEach(v => {
           if (v.student_name) {
             v.student_name = v.student_name.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
           }
         });
-        return parsed;
-      } catch (e) { }
+      } catch (e) { 
+        violations = [];
+      }
     }
-    // Nạp toàn bộ dữ liệu vi phạm chuẩn từ window.DEFAULT_VIOLATIONS (Tuần 1 đến 7)
-    return window.DEFAULT_VIOLATIONS || [];
+    
+    if (!violations || violations.length === 0) {
+      violations = (window.DEFAULT_VIOLATIONS || []).slice();
+    } else if (window.DEFAULT_VIOLATIONS && window.DEFAULT_VIOLATIONS.length > 0) {
+      // Đảm bảo dữ liệu vi phạm chuẩn (đặc biệt là Tuần 6 ngày 13/10/2026) được đồng bộ nếu trong localStorage chưa có
+      const hasW6 = violations.some(v => parseInt(v.week, 10) === 6);
+      if (!hasW6) {
+        const defW6 = window.DEFAULT_VIOLATIONS.filter(v => parseInt(v.week, 10) === 6);
+        if (defW6.length > 0) {
+          violations = violations.concat(defW6);
+          try { localStorage.setItem('dshs_violations', JSON.stringify(violations)); } catch (e) {}
+        }
+      }
+    }
+    return violations;
   }
 
   saveViolations() {
@@ -304,6 +319,13 @@ class DisciplineApp {
       try {
         const parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
+          // Đồng bộ Tuần 6 nếu dữ liệu cũ chưa có điểm trừ của 11A04
+          if (window.DEFAULT_LOCKED_WEEKS && window.DEFAULT_LOCKED_WEEKS['6']) {
+            if (!parsed['6'] || !parsed['6'].classes || (parsed['6'].classes['11A04'] && parsed['6'].classes['11A04'].diemTru === 0)) {
+              parsed['6'] = JSON.parse(JSON.stringify(window.DEFAULT_LOCKED_WEEKS['6']));
+              try { localStorage.setItem('dshs_emulation_weeks', JSON.stringify(parsed)); } catch (e) {}
+            }
+          }
           return parsed;
         }
       } catch (e) {
@@ -463,6 +485,20 @@ class DisciplineApp {
   }
 
   switchTab(targetTab) {
+    const SENSITIVE_ADMIN_TABS = ['tab-students', 'tab-rules', 'tab-backup'];
+    if (SENSITIVE_ADMIN_TABS.includes(targetTab) && !this.isDataEntryUnlocked()) {
+      let tabName = 'mục quản trị này';
+      if (targetTab === 'tab-students') tabName = 'Quản Lý Học Sinh';
+      else if (targetTab === 'tab-rules') tabName = 'Danh Mục Lỗi & Điểm';
+      else if (targetTab === 'tab-backup') tabName = 'Sao Lưu & Bảo Vệ Dữ Liệu';
+
+      this.showToast(`🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin. Vui lòng nhập mật khẩu (2806) để truy cập!`, 'warning');
+      this.openPasswordModal(() => {
+        this.switchTab(targetTab);
+      });
+      return;
+    }
+
     this.activeTab = targetTab;
     document.querySelectorAll('.tab-btn').forEach(b => {
       if (b.getAttribute('data-tab') === targetTab) {
@@ -1695,17 +1731,26 @@ class DisciplineApp {
     tbody.innerHTML = filtered.map((v, idx) => {
       const isLocked = this.isWeekLocked(v.week);
       let weekBadge = `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">T${v.week}</span>`;
-      let deleteBtn = `
-        <button onclick="window.app.deleteViolation(${v.id})" class="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer" title="Xóa bản ghi này">
-          <i data-lucide="trash-2" class="w-4 h-4"></i>
-        </button>
-      `;
+      const isAuth = this.isDataEntryUnlocked();
+      let deleteBtn = '';
 
-      if (isLocked) {
+      if (!isAuth) {
+        deleteBtn = `
+          <span class="text-slate-300 p-1 flex items-center justify-center" title="Chế độ Chỉ xem (Không thể xóa)">
+            <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-300"></i>
+          </span>
+        `;
+      } else if (isLocked) {
         weekBadge = `<span class="bg-amber-100 text-amber-800 border border-amber-300 text-xs px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1" title="Tuần đã khóa niêm phong"><i data-lucide="lock" class="w-3 h-3 text-amber-600"></i> T${v.week}</span>`;
         deleteBtn = `
           <button disabled class="text-slate-300 p-1 cursor-not-allowed" title="Tuần ${v.week} đã khóa niêm phong (Read-Only)">
             <i data-lucide="lock" class="w-4 h-4 text-slate-300"></i>
+          </button>
+        `;
+      } else {
+        deleteBtn = `
+          <button onclick="window.app.deleteViolation(${v.id})" class="text-slate-400 hover:text-rose-600 p-1 rounded transition cursor-pointer" title="Xóa bản ghi này">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
           </button>
         `;
       }
@@ -3268,6 +3313,7 @@ class DisciplineApp {
   }
 
   renderSnapshotsList() {
+    const isAuth = this.isDataEntryUnlocked();
     const container = document.getElementById('snapshots-list-container');
     const emptyState = document.getElementById('snapshots-empty-state');
     if (!container) return;
@@ -3291,15 +3337,22 @@ class DisciplineApp {
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
-          <button type="button" onclick="window.app.restoreSnapshot('${s.id}')"
-                  class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition text-[11px] shadow-xs cursor-pointer flex items-center gap-1">
-            <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
-            <span>Khôi phục</span>
-          </button>
-          <button type="button" onclick="window.app.deleteSnapshot('${s.id}')"
-                  class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer transition">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          </button>
+          ${isAuth ? `
+            <button type="button" onclick="window.app.restoreSnapshot('${s.id}')"
+                    class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition text-[11px] shadow-xs cursor-pointer flex items-center gap-1">
+              <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+              <span>Khôi phục</span>
+            </button>
+            <button type="button" onclick="window.app.deleteSnapshot('${s.id}')"
+                    class="p-1.5 text-slate-400 hover:text-red-600 rounded-lg cursor-pointer transition">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          ` : `
+            <span class="text-slate-400 text-xs italic font-medium flex items-center gap-1">
+              <i data-lucide="lock" class="w-3 h-3 text-amber-500"></i>
+              <span>Cần Admin</span>
+            </span>
+          `}
         </div>
       </div>
     `).join('');
@@ -3535,6 +3588,7 @@ class DisciplineApp {
   // ==================== QUẢN LÝ HỌC SINH (TAB 4 - NGUỒN MỞ) ====================
 
   renderStudentsTable() {
+    const isAuth = this.isDataEntryUnlocked();
     const tbody = document.getElementById('students-table-body');
     const countSpan = document.getElementById('student-table-count');
     const searchVal = (document.getElementById('student-search-query').value || '').trim().toLowerCase();
@@ -3563,14 +3617,21 @@ class DisciplineApp {
         <td class="text-center text-slate-600 text-xs">${s.gender || '-'}</td>
         <td class="text-center font-mono text-[11px] text-slate-400">#${s.id}</td>
         <td class="text-center">
-          <div class="flex items-center justify-center gap-1.5">
-            <button onclick="window.app.editStudent(${s.id})" class="text-slate-400 hover:text-blue-600 p-1" title="Sửa học sinh">
-              <i data-lucide="edit" class="w-3.5 h-3.5"></i>
-            </button>
-            <button onclick="window.app.deleteStudent(${s.id})" class="text-slate-400 hover:text-red-600 p-1" title="Xóa học sinh">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
-          </div>
+          ${isAuth ? `
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="window.app.editStudent(${s.id})" class="text-slate-400 hover:text-blue-600 p-1" title="Sửa học sinh">
+                <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="window.app.deleteStudent(${s.id})" class="text-slate-400 hover:text-red-600 p-1" title="Xóa học sinh">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          ` : `
+            <span class="text-slate-400 text-xs italic font-medium flex items-center justify-center gap-1">
+              <i data-lucide="lock" class="w-3 h-3 text-amber-500"></i>
+              <span>Chỉ xem</span>
+            </span>
+          `}
         </td>
       </tr>
     `).join('');
@@ -3756,6 +3817,7 @@ class DisciplineApp {
   // ==================== QUẢN LÝ QUY ĐỊNH LỖI (TAB 5 - NGUỒN MỞ) ====================
 
   renderRulesTable() {
+    const isAuth = this.isDataEntryUnlocked();
     const tbody = document.getElementById('rules-table-body');
     if (!tbody) return;
 
@@ -3774,14 +3836,21 @@ class DisciplineApp {
           <td class="text-center font-bold text-red-600 bg-red-50/50">-${r.points} điểm</td>
           <td class="text-center">${severityBadge}</td>
           <td class="text-center">
-            <div class="flex items-center justify-center gap-1.5">
-              <button onclick="window.app.editRule(${r.id})" class="text-slate-400 hover:text-blue-600 p-1" title="Sửa quy định">
-                <i data-lucide="edit" class="w-3.5 h-3.5"></i>
-              </button>
-              <button onclick="window.app.deleteRule(${r.id})" class="text-slate-400 hover:text-red-600 p-1" title="Xóa quy định">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              </button>
-            </div>
+            ${isAuth ? `
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="window.app.editRule(${r.id})" class="text-slate-400 hover:text-blue-600 p-1" title="Sửa quy định">
+                  <i data-lucide="edit" class="w-3.5 h-3.5"></i>
+                </button>
+                <button onclick="window.app.deleteRule(${r.id})" class="text-slate-400 hover:text-red-600 p-1" title="Xóa quy định">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            ` : `
+              <span class="text-slate-400 text-xs italic font-medium flex items-center justify-center gap-1">
+                <i data-lucide="lock" class="w-3 h-3 text-amber-500"></i>
+                <span>Chỉ xem</span>
+              </span>
+            `}
           </td>
         </tr>
       `;
@@ -4030,11 +4099,21 @@ class DisciplineApp {
 
   handleAuthButtonClick() {
     if (this.isDataEntryUnlocked()) {
-      if (confirm('Bạn đang ở trạng thái đã đăng nhập. Bạn có muốn đăng xuất để chuyển sang chế độ Chỉ xem (Read-only) không?')) {
+      if (confirm('Bạn đang ở trạng thái Quản trị viên. Bạn có muốn đăng xuất để chuyển sang chế độ Chỉ xem (Read-only) không?')) {
         sessionStorage.removeItem('data_entry_unlocked');
         localStorage.removeItem('data_entry_unlocked');
+
+        // Khóa lại các tuần đã qua để đảm bảo an toàn sau khi đăng xuất
+        this.lockedWeeks = [1, 2, 3, 4, 5, 6];
+        this.saveLockedWeeks();
+
+        const SENSITIVE_ADMIN_TABS = ['tab-students', 'tab-rules', 'tab-backup'];
+        if (SENSITIVE_ADMIN_TABS.includes(this.activeTab)) {
+          this.switchTab('tab-emulation');
+        }
+
         this.updateLockStatusUI();
-        this.showToast('Đã chuyển sang chế độ chỉ xem.', 'info');
+        this.showToast('Đã đăng xuất. Toàn bộ các mục quản trị đã được khóa an toàn (Chế độ Chỉ xem).', 'info');
       }
     } else {
       this.openPasswordModal();
@@ -4045,14 +4124,14 @@ class DisciplineApp {
     return sessionStorage.getItem('data_entry_unlocked') === 'true';
   }
 
-  updateLockStatusUI() {
+    updateLockStatusUI() {
     const text = document.getElementById('lock-status-text');
     const icon = document.getElementById('lock-icon');
     const btn = document.getElementById('btn-toggle-auth-lock');
     const isUnlocked = this.isDataEntryUnlocked();
 
     if (text) {
-      text.textContent = isUnlocked ? '🔓 Đã đăng nhập' : '🔒 Đăng nhập';
+      text.textContent = isUnlocked ? '🔓 Quản trị Admin' : '🔒 Đăng nhập';
     }
     if (icon) {
       icon.setAttribute('data-lucide', isUnlocked ? 'unlock' : 'lock');
@@ -4064,30 +4143,80 @@ class DisciplineApp {
         : 'flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs md:text-sm font-bold px-3.5 py-2 rounded-xl transition shadow-sm min-h-[44px] cursor-pointer';
     }
 
+    // 1. Cập nhật các badge khóa trên thanh điều hướng tab
+    ['tab-students', 'tab-rules', 'tab-backup'].forEach(tabId => {
+      const lockBadge = document.getElementById(`lock-badge-${tabId}`);
+      if (lockBadge) {
+        lockBadge.style.display = isUnlocked ? 'none' : 'inline-flex';
+      }
+    });
+
+    // 2. Tab 1: Vô hiệu hóa nút Thêm lỗi & Chạy AI khi chưa đăng nhập
     const btnManualAdd = document.getElementById('btn-manual-add');
     if (btnManualAdd) {
       if (isUnlocked) {
+        btnManualAdd.disabled = false;
         btnManualAdd.innerHTML = `<i data-lucide="plus-circle" class="w-5 h-5 pointer-events-none"></i><span>Thêm Lỗi</span>`;
         btnManualAdd.className = 'w-full text-sm font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white p-3.5 rounded-xl transition shadow-md shadow-emerald-500/25 flex items-center justify-center gap-1.5 cursor-pointer';
       } else {
-        btnManualAdd.innerHTML = `<i data-lucide="lock" class="w-4 h-4 pointer-events-none text-amber-300"></i><span>Thêm Lỗi (Cần Đăng Nhập)</span>`;
-        btnManualAdd.className = 'w-full text-sm font-bold bg-slate-700 hover:bg-slate-800 text-slate-200 p-3.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-pointer';
+        btnManualAdd.disabled = true;
+        btnManualAdd.innerHTML = `<i data-lucide="lock" class="w-4 h-4 pointer-events-none text-amber-300"></i><span>Thêm Lỗi (Chỉ Xem - Cần Đăng Nhập)</span>`;
+        btnManualAdd.className = 'w-full text-sm font-bold bg-slate-700 hover:bg-slate-800 text-slate-300 p-3.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 cursor-not-allowed opacity-80';
       }
     }
 
     const btnRunAi = document.getElementById('btn-run-ai-parse');
     if (btnRunAi) {
       if (isUnlocked) {
+        btnRunAi.disabled = false;
         btnRunAi.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4 pointer-events-none"></i><span>Bắt Đầu Chuẩn Hóa Bằng AI</span>`;
         btnRunAi.className = 'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-500/25 cursor-pointer';
       } else {
-        btnRunAi.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5 pointer-events-none text-amber-300"></i><span>Bắt Đầu Chuẩn Hóa AI (Cần Đăng Nhập)</span>`;
-        btnRunAi.className = 'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-slate-200 text-xs font-bold rounded-xl transition shadow-sm cursor-pointer';
+        btnRunAi.disabled = true;
+        btnRunAi.innerHTML = `<i data-lucide="lock" class="w-3.5 h-3.5 pointer-events-none text-amber-300"></i><span>Chuẩn Hóa AI (Chỉ Xem)</span>`;
+        btnRunAi.className = 'flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold rounded-xl transition shadow-sm cursor-not-allowed opacity-80';
       }
     }
 
-    // Cập nhật lại Bảng Thi Đua để chuyển trạng thái giữa Chỉ xem (plain text) và Sửa (input)
+    // 3. Tab 3: Ẩn hoặc Hiện toàn bộ các nút Thêm / Sửa / Khóa tuần
+    const btnAddBonus = document.getElementById('btn-add-bonus-point');
+    const btnImport = document.getElementById('btn-open-excel-import');
+    const btnSaveTable = document.getElementById('btn-save-emulation-table');
+    const btnToggleWeekLock = document.getElementById('btn-toggle-week-lock');
+    const btnUnlockAllWeeks = document.getElementById('btn-unlock-all-weeks');
+    const btnManageWeeks = document.getElementById('btn-open-manage-weeks-modal');
+
+    if (btnAddBonus) btnAddBonus.style.display = isUnlocked ? 'inline-flex' : 'none';
+    if (btnImport) btnImport.style.display = isUnlocked ? 'inline-flex' : 'none';
+    if (btnSaveTable) btnSaveTable.style.display = isUnlocked ? 'inline-flex' : 'none';
+    if (btnToggleWeekLock) btnToggleWeekLock.style.display = isUnlocked ? 'inline-flex' : 'none';
+    if (btnUnlockAllWeeks) btnUnlockAllWeeks.style.display = isUnlocked ? 'inline-flex' : 'none';
+    if (btnManageWeeks) btnManageWeeks.style.display = isUnlocked ? 'inline-flex' : 'none';
+
+    // 4. Tab 4: Ẩn / Hiện nút Thêm / Import học sinh
+    ['btn-open-add-student', 'btn-open-import-students', 'btn-reset-default-students'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = isUnlocked ? 'inline-flex' : 'none';
+    });
+
+    // 5. Tab 5: Ẩn / Hiện nút Thêm / Reset nội quy
+    ['btn-open-add-rule', 'btn-reset-default-rules'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = isUnlocked ? 'inline-flex' : 'none';
+    });
+
+    // 6. Tab 6: Ẩn / Hiện nút Tạo điểm khôi phục / Reset
+    ['btn-open-create-snapshot', 'btn-trigger-snapshot-modal', 'btn-clear-all-snapshots'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = isUnlocked ? 'inline-flex' : 'none';
+    });
+
+    // Cập nhật lại toàn bộ bảng biểu để ẩn/hiện các nút Thao tác Sửa / Xóa
     this.renderEmulationTable();
+    this.renderLogsTable();
+    this.renderStudentsTable();
+    this.renderRulesTable();
+    this.renderSnapshotsList();
 
     if (window.lucide) window.lucide.createIcons();
   }
@@ -4105,8 +4234,10 @@ class DisciplineApp {
     }
     if (input) {
       input.value = '';
-      input.setAttribute('autocomplete', 'off');
-      input.setAttribute('name', 'lhp_otp_token');
+      input.setAttribute('autocomplete', 'new-password');
+      input.setAttribute('name', 'admin_auth_code_' + Math.random().toString(36).slice(2));
+      input.setAttribute('data-lpignore', 'true');
+      input.setAttribute('data-1p-ignore', 'true');
       input.classList.remove('border-red-500', 'bg-red-50');
       input.classList.add('border-slate-300');
     }
