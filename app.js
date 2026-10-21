@@ -3,6 +3,16 @@
  * Xây dựng theo Custom System Instruction & AI_INSTRUCTIONS.md
  */
 
+// ==================== CẤU HÌNH TOÀN CỤC (GLOBAL ENDPOINT CONFIG) ====================
+window.GLOBAL_CONFIG = {
+  // Đường dẫn Google Apps Script Web App Endpoint chính thức toàn hệ thống
+  DEFAULT_GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec',
+  // Kênh Cloud Registry trung gian để phát tán và tự động đồng bộ Endpoint mới sang mọi điện thoại/máy tính
+  REGISTRY_URL: 'https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/gas_endpoint_registry',
+  CONFIG_FILE_URL: 'config.json',
+  VERSION: '2.1.0'
+};
+
 class DisciplineApp {
   constructor() {
     this.startDate = new Date(2026, 8, 7); // Thứ Hai, 07/09/2026 (Tuần 1)
@@ -592,11 +602,14 @@ class DisciplineApp {
       localStorage.setItem('gemini_api_key', DEFAULT_API_KEY);
     }
 
-    // 2. Migration: Tự động cập nhật URL Google Apps Script chính thức mới nhất
-    const savedUrl = localStorage.getItem('dshs_cloud_url');
-    if (!savedUrl || savedUrl.includes('kvdb.io') || !savedUrl.includes('AKfycbwQxI054Rt_')) {
-      localStorage.setItem('dshs_cloud_url', this.DEFAULT_CLOUD_URL);
-    }
+    // 2. Đồng bộ Endpoint toàn cục (Global Endpoint):
+    // Tự động kiểm tra và cập nhật Endpoint mới nhất từ Cloud / config.json cho điện thoại và máy tính
+    this.syncGlobalEndpoint().then(() => {
+      // Sau khi cập nhật Endpoint mới nhất, tiến hành đồng bộ dữ liệu đám mây
+      this.syncCloudData(true);
+    }).catch(() => {
+      this.syncCloudData(true);
+    });
 
     // Luôn cập nhật sẵn URL vào ô input Cài đặt để hiển thị ngay lập tức
     const inputCloudUrl = document.getElementById('input-cloud-url');
@@ -605,7 +618,6 @@ class DisciplineApp {
     }
 
     this.setupDateAndTime();
-    this.syncCloudData(true);
     this.setupTabs();
     this.setupEventListeners();
     this.setupSettingsModal();
@@ -890,25 +902,27 @@ class DisciplineApp {
     if (btnCloudSync) btnCloudSync.addEventListener('click', () => this.syncCloudData(false));
 
     // ── Auto-Refresh & Polling: Đồng bộ thời gian thực đa thiết bị ──────────────
-    // 1. visibilitychange: Kéo dữ liệu khi người dùng quay lại tab (tránh dữ liệu trống)
-    //    Dùng biến _lastVisibilitySyncTime để tránh gọi trùng ngay sau window.focus
+    // 1. visibilitychange: Kiểm tra Endpoint mới và kéo dữ liệu khi người dùng quay lại tab
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
         const now = Date.now();
-        // Chỉ kéo nếu lần cuối sync cách đây hơn 3 giây (tránh duplicate với focus event)
         if (!this._lastVisibilitySyncTime || (now - this._lastVisibilitySyncTime > 3000)) {
           this._lastVisibilitySyncTime = now;
-          this.pullAndMergeFromCloud(true);
+          this.syncGlobalEndpoint().finally(() => {
+            this.pullAndMergeFromCloud(true);
+          });
         }
       }
     });
 
-    // 2. window.focus: Kéo dữ liệu khi cửa sổ/tab được chọn lại (đa tab, đa thiết bị)
+    // 2. window.focus: Kiểm tra Endpoint mới và kéo dữ liệu khi cửa sổ/tab được chọn lại
     window.addEventListener('focus', () => {
       const now = Date.now();
       if (!this._lastVisibilitySyncTime || (now - this._lastVisibilitySyncTime > 3000)) {
         this._lastVisibilitySyncTime = now;
-        this.pullAndMergeFromCloud(true);
+        this.syncGlobalEndpoint().finally(() => {
+          this.pullAndMergeFromCloud(true);
+        });
       }
     });
 
@@ -5121,20 +5135,122 @@ class DisciplineApp {
   // ==================== CƠ SỞ DỮ LIỆU ĐÁM MÂY (GOOGLE SHEETS CLOUD DATABASE) ====================
 
   get DEFAULT_CLOUD_URL() {
-    // Google Apps Script Web App (Google Sheets Cloud Database chính thức)
-    return 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec';
+    return (window.GLOBAL_CONFIG && window.GLOBAL_CONFIG.DEFAULT_GAS_ENDPOINT)
+      ? window.GLOBAL_CONFIG.DEFAULT_GAS_ENDPOINT
+      : 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec';
   }
 
   getCloudUrl() {
-    return localStorage.getItem('dshs_cloud_url') || this.DEFAULT_CLOUD_URL;
+    const saved = localStorage.getItem('dshs_cloud_url');
+    // Nếu link trong localStorage trống, là link cũ kvdb, hoặc không phải link script.google.com: tự động fallback về link chính thức
+    if (!saved || saved.includes('kvdb.io') || !saved.includes('script.google.com')) {
+      return this.DEFAULT_CLOUD_URL;
+    }
+    return saved.trim();
   }
 
-  setCloudUrl(url) {
-    if (url && url.trim()) {
-      localStorage.setItem('dshs_cloud_url', url.trim());
-    } else {
-      localStorage.removeItem('dshs_cloud_url');
+  async setCloudUrl(url, broadcast = true) {
+    const cleanUrl = (url && url.trim()) ? url.trim() : this.DEFAULT_CLOUD_URL;
+    localStorage.setItem('dshs_cloud_url', cleanUrl);
+    localStorage.setItem('dshs_cloud_url_updated_at', String(Date.now()));
+
+    // Cập nhật giá trị hiển thị trên ô input Cài đặt nếu có trong DOM
+    const inputCloudUrl = document.getElementById('input-cloud-url');
+    if (inputCloudUrl) {
+      inputCloudUrl.value = cleanUrl;
     }
+
+    // Nếu Admin cập nhật link Endpoint và có cờ broadcast:
+    // Tự động phát tán link mới lên Cloud Registry để điện thoại và các thiết bị khác tự động nhận diện và cập nhật ngay lập tức!
+    if (broadcast && (this.isAdmin() || this.isSupervisor())) {
+      await this.broadcastEndpointToCloud(cleanUrl);
+    }
+  }
+
+  /**
+   * Phát tán đường dẫn Google Apps Script mới lên Cloud Registry toàn hệ thống
+   */
+  async broadcastEndpointToCloud(newUrl) {
+    try {
+      const registryUrl = (window.GLOBAL_CONFIG && window.GLOBAL_CONFIG.REGISTRY_URL)
+        ? window.GLOBAL_CONFIG.REGISTRY_URL
+        : 'https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/gas_endpoint_registry';
+
+      const payload = {
+        url: newUrl,
+        updated_at: Date.now(),
+        updated_by: this.isAdmin() ? 'admin' : 'supervisor'
+      };
+
+      await fetch(registryUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      console.log('✅ Đã phát tán link Google Apps Script mới lên Cloud Registry:', newUrl);
+    } catch (err) {
+      console.warn('Lỗi khi phát tán Endpoint lên Registry:', err);
+    }
+  }
+
+  /**
+   * Tự động kiểm tra và đồng bộ Endpoint mới nhất từ Cloud / config.json cho các thiết bị khác (điện thoại, máy tính bảng)
+   */
+  async syncGlobalEndpoint() {
+    try {
+      const now = Date.now();
+      let latestUrl = null;
+      let latestTime = 0;
+
+      // 1. Thử lấy từ Cloud Registry (nơi Admin vừa phát tán link mới nhất)
+      try {
+        const registryUrl = (window.GLOBAL_CONFIG && window.GLOBAL_CONFIG.REGISTRY_URL)
+          ? `${window.GLOBAL_CONFIG.REGISTRY_URL}?_t=${now}`
+          : `https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/gas_endpoint_registry?_t=${now}`;
+
+        const regRes = await fetch(registryUrl, { cache: 'no-cache' });
+        if (regRes.ok) {
+          const regData = await regRes.json();
+          if (regData && regData.url && regData.url.includes('script.google.com')) {
+            latestUrl = regData.url.trim();
+            latestTime = regData.updated_at || now;
+          }
+        }
+      } catch (e) {
+        // Tiếp tục thử config.json nếu registry bận
+      }
+
+      // 2. Thử lấy từ config.json trên server nếu Registry chưa có
+      if (!latestUrl) {
+        try {
+          const cfgRes = await fetch(`config.json?_t=${now}`, { cache: 'no-cache' });
+          if (cfgRes.ok) {
+            const cfgData = await cfgRes.json();
+            if (cfgData && cfgData.gas_endpoint && cfgData.gas_endpoint.includes('script.google.com')) {
+              latestUrl = cfgData.gas_endpoint.trim();
+              latestTime = cfgData.updated_at || now;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 3. Nếu tìm thấy Endpoint hợp lệ và khác với Endpoint hiện tại trên thiết bị này:
+      if (latestUrl && latestUrl !== this.getCloudUrl()) {
+        const currentLocalTime = parseInt(localStorage.getItem('dshs_cloud_url_updated_at') || '0', 10);
+
+        // Với máy khách (điện thoại, máy tính bảng) hoặc khi link trên Cloud mới hơn:
+        // Tự động nhận diện và cập nhật ngay theo link mới này mà không bị kẹt ở link cũ!
+        if (!this.isAdmin() || latestTime > currentLocalTime) {
+          console.log(`🔄 Tự động cập nhật Endpoint Google Apps Script mới: ${latestUrl}`);
+          await this.setCloudUrl(latestUrl, false);
+          this.updateCloudStatusBadge(true);
+          return true; // Đã cập nhật Endpoint mới
+        }
+      }
+    } catch (err) {
+      console.warn('Lỗi kiểm tra Global Endpoint:', err);
+    }
+    return false;
   }
 
   loadDeletedViolationIds() {
@@ -5566,9 +5682,6 @@ class DisciplineApp {
       this.updateCloudStatusBadge(true);
     }
   }
-      this.updateCloudStatusBadge(true);
-    }
-  }
 
   async testCloudConnection() {
     const inputUrl = document.getElementById('input-cloud-url');
@@ -5592,7 +5705,7 @@ class DisciplineApp {
         let respData = null;
         try { respData = await res.json(); } catch(e){}
 
-        this.setCloudUrl(url);
+        await this.setCloudUrl(url, true);
         this.updateCloudStatusBadge(true);
 
         const detailMsg = (respData && respData.spreadsheet_name) 
