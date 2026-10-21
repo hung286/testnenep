@@ -506,6 +506,18 @@
           <div id="emulation-week-status-badge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition">
             <!-- Dynamically populated: 🔒 Đã khóa tuần OR 🔓 Đang mở nhập liệu -->
           </div>
+
+          <!-- Nút Admin Mở Khóa / Khóa Tuần Hiện Tại -->
+          <button id="btn-toggle-week-lock" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition shadow-xs cursor-pointer border bg-amber-500 hover:bg-amber-600 text-white" title="Quyền Admin (2806): Khóa hoặc Mở khóa tuần này để chỉnh sửa">
+            <i data-lucide="unlock" class="w-3.5 h-3.5"></i>
+            <span>Mở Khóa Tuần (Admin)</span>
+          </button>
+
+          <!-- Nút Quản Lý Khóa Tất Cả Các Tuần -->
+          <button id="btn-open-manage-weeks-modal" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer border border-slate-300" title="Quản lý trạng thái khóa/mở tất cả các tuần trong năm học">
+            <i data-lucide="sliders" class="w-3.5 h-3.5 text-slate-600"></i>
+            <span class="hidden md:inline">Quản Lý Khóa Tuần</span>
+          </button>
         </div>
 
         <!-- Action Buttons Bar -->
@@ -631,8 +643,7 @@
                 <!-- Nhóm Vắng (2 cột) -->
                 <th colspan="2" class="text-center th-group-absence border border-slate-200">HS VẮNG</th>
                 
-                <!-- Nhóm Điểm Cộng (1 cột) -->
-                <th rowspan="2" class="text-center w-16 th-group-bonus border border-amber-200 font-bold" title="Điểm cộng vào TB nếu có">Điểm Cộng</th>
+
                 
                 <!-- Nhóm Tổng Hợp Chung (3 cột) -->
                 <th colspan="3" class="text-center th-group-overall border border-emerald-200">TỔNG HỢP CHUNG</th>
@@ -669,6 +680,17 @@
               <!-- Dynamically populated 29 rows -->
             </tbody>
           </table>
+        </div>
+
+        <!-- Phần Ghi Chú Điểm Cộng Dưới Bảng (Chuẩn Mẫu Nhà Trường) -->
+        <div id="emulation-notes-section" class="p-4 bg-amber-50/80 border-t border-amber-200 text-xs">
+          <div class="flex items-center gap-2 font-bold text-amber-900 mb-1.5">
+            <i data-lucide="file-text" class="w-4 h-4 text-amber-700"></i>
+            <span class="tracking-wide uppercase font-extrabold">GHI CHÚ ĐIỂM CỘNG THI ĐUA TRONG TUẦN:</span>
+          </div>
+          <div id="emulation-notes-content" class="text-slate-700 space-y-1 pl-6 text-xs">
+            <!-- Dynamically populated: e.g. "• Lớp 10B01 cộng 1đ, lý do: thực hiện công trình tự giác" -->
+          </div>
         </div>
       </div>
 
@@ -843,6 +865,17 @@
             </tbody>
           </table>
         </div>
+
+        <!-- Phần Ghi Chú Điểm Cộng Dưới Bảng (Chuẩn Mẫu Nhà Trường) -->
+        <div id="emulation-notes-section" class="p-4 bg-amber-50/80 border-t border-amber-200 text-xs">
+          <div class="flex items-center gap-2 font-bold text-amber-900 mb-1.5">
+            <i data-lucide="file-text" class="w-4 h-4 text-amber-700"></i>
+            <span class="tracking-wide uppercase font-extrabold">GHI CHÚ ĐIỂM CỘNG THI ĐUA TRONG TUẦN:</span>
+          </div>
+          <div id="emulation-notes-content" class="text-slate-700 space-y-1 pl-6 text-xs">
+            <!-- Dynamically populated: e.g. "• Lớp 10B01 cộng 1đ, lý do: thực hiện công trình tự giác" -->
+          </div>
+        </div>
       </div>
 
     </div>
@@ -889,6 +922,17 @@
               <!-- Rendered dynamically -->
             </tbody>
           </table>
+        </div>
+
+        <!-- Phần Ghi Chú Điểm Cộng Dưới Bảng (Chuẩn Mẫu Nhà Trường) -->
+        <div id="emulation-notes-section" class="p-4 bg-amber-50/80 border-t border-amber-200 text-xs">
+          <div class="flex items-center gap-2 font-bold text-amber-900 mb-1.5">
+            <i data-lucide="file-text" class="w-4 h-4 text-amber-700"></i>
+            <span class="tracking-wide uppercase font-extrabold">GHI CHÚ ĐIỂM CỘNG THI ĐUA TRONG TUẦN:</span>
+          </div>
+          <div id="emulation-notes-content" class="text-slate-700 space-y-1 pl-6 text-xs">
+            <!-- Dynamically populated: e.g. "• Lớp 10B01 cộng 1đ, lý do: thực hiện công trình tự giác" -->
+          </div>
         </div>
       </div>
 
@@ -1413,7 +1457,7 @@
   </div>
 
     <!-- ================================================================ -->
-  <!-- MODAL: XÁC THỰC MẬT KHẨU NHẬP LIỆU (lhp38)                      -->
+  <!-- MODAL: XÁC THỰC MẬT KHẨU NHẬP LIỆU (2806)                      -->
   <!-- ================================================================ -->
   <div id="modal-login-password" 
        class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4"
@@ -1504,8 +1548,8 @@
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Lý Do Cộng Điểm:</label>
-          <input type="text" id="bonus-input-reason" placeholder="VD: Đạt giải Nhất báo tường, Trực ban xuất sắc..."
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Lý Do Cộng Điểm <span class="text-red-500 font-extrabold">*</span>:</label>
+          <input type="text" id="bonus-input-reason" placeholder="Bắt buộc nhập: VD: thực hiện công trình tự giác, hoa điểm 10..." required
                  class="w-full text-xs p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
         </div>
 
@@ -1553,6 +1597,17 @@
               <!-- Dynamically populated -->
             </tbody>
           </table>
+        </div>
+
+        <!-- Phần Ghi Chú Điểm Cộng Dưới Bảng (Chuẩn Mẫu Nhà Trường) -->
+        <div id="emulation-notes-section" class="p-4 bg-amber-50/80 border-t border-amber-200 text-xs">
+          <div class="flex items-center gap-2 font-bold text-amber-900 mb-1.5">
+            <i data-lucide="file-text" class="w-4 h-4 text-amber-700"></i>
+            <span class="tracking-wide uppercase font-extrabold">GHI CHÚ ĐIỂM CỘNG THI ĐUA TRONG TUẦN:</span>
+          </div>
+          <div id="emulation-notes-content" class="text-slate-700 space-y-1 pl-6 text-xs">
+            <!-- Dynamically populated: e.g. "• Lớp 10B01 cộng 1đ, lý do: thực hiện công trình tự giác" -->
+          </div>
         </div>
       </div>
 
@@ -1706,7 +1761,7 @@
 
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mật khẩu quản trị:</label>
-          <input type="password" id="input-backup-password" placeholder="Nhập mật khẩu (lhp38)..."
+          <input type="password" id="input-backup-password" placeholder="Nhập mật khẩu (2806)..."
                  class="w-full text-center text-sm font-mono tracking-widest p-2.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500">
           <p id="backup-password-error" class="hidden text-xs text-rose-600 font-bold mt-1">Mật khẩu quản trị không chính xác!</p>
         </div>
@@ -1811,6 +1866,67 @@
         </div>
       </form>
 
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- MODAL: QUẢN LÝ KHÓA / MỞ CÁC TUẦN THI ĐUA (Admin 2806)          -->
+  <!-- ================================================================ -->
+  <div id="modal-manage-weeks" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col animate-scale-up">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-base">Quản Lý Khóa & Mở Tuần Thi Đua (Admin)</h3>
+            <p class="text-xs text-slate-500">Mật khẩu xác thực quyền quản trị: <strong class="text-amber-700 font-mono">2806</strong></p>
+          </div>
+        </div>
+        <button id="btn-close-manage-weeks-modal" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 mt-4 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span class="text-slate-600 font-medium">Thao tác nhanh cho cả năm học:</span>
+        <div class="flex items-center gap-2">
+          <button id="btn-lock-past-weeks" class="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-lg font-bold transition cursor-pointer">
+            🔒 Khóa Các Tuần Đã Qua
+          </button>
+          <button id="btn-open-current-week-only" class="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition shadow-xs cursor-pointer">
+            🔓 Chỉ Mở Tuần Hiện Tại
+          </button>
+        </div>
+      </div>
+
+      <!-- Weeks Table / Grid -->
+      <div class="mt-4 overflow-y-auto flex-1 max-h-[460px] border border-slate-200 rounded-xl">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead class="bg-slate-100 text-slate-700 font-bold sticky top-0 border-b border-slate-200 z-10">
+            <tr>
+              <th class="p-3 text-center w-24">Tuần</th>
+              <th class="p-3">Khoảng Thời Gian</th>
+              <th class="p-3 text-center w-36">Trạng Thái</th>
+              <th class="p-3 text-center w-36">Thao Tác Admin</th>
+            </tr>
+          </thead>
+          <tbody id="manage-weeks-tbody" class="divide-y divide-slate-100">
+            <!-- Dynamically populated rows for Weeks 1 to 35+ -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p class="text-[11px] text-slate-500 italic">
+          * Tuần được mở khóa cho phép giáo viên & quản trị viên nhập, chỉnh sửa điểm và import Excel. Các tuần khác vẫn khóa an toàn.
+        </p>
+        <button id="btn-done-manage-weeks" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer">
+          Đóng
+        </button>
+      </div>
     </div>
   </div>
 
