@@ -992,17 +992,18 @@
 
         <div class="relative mb-2">
           <input type="password" id="login-password" 
-                 name="nenep_auth_token_off"
+                 name="lhp_otp_token"
                  autocomplete="off"
                  autocorrect="off"
                  autocapitalize="off"
                  spellcheck="false"
                  data-lpignore="true"
+                 data-1p-ignore="true"
                  data-form-type="other"
-                 placeholder="Nhập mật khẩu lhp38..."
+                 placeholder="Nhập mật khẩu..."
                  class="w-full text-center text-base md:text-lg font-mono tracking-widest p-4 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 transition">
         </div>
-        <p id="password-error-msg" class="text-xs md:text-sm text-red-600 font-bold hidden mb-3">Sai mật khẩu</p>
+        <p id="password-error-msg" class="text-xs md:text-sm text-red-600 font-bold hidden mb-3">Đăng nhập không thành công!</p>
 
         <div class="flex items-center gap-3 mt-4">
           <button type="button" id="btn-cancel-password-modal"

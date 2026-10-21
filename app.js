@@ -11,6 +11,7 @@ class DisciplineApp {
     this.students = this.loadStudents();
     this.rules = this.loadRules();
     this.violations = this.loadViolations();
+    this.deletedViolationIds = this.loadDeletedViolationIds();
     
     this.activeTab = 'tab-ai-logger';
     this.pendingAiRecords = [];
@@ -21,6 +22,8 @@ class DisciplineApp {
     // Charts
     this.classPenaltyChart = null;
     this.topErrorsChart = null;
+    this.isSyncingCloud = false;
+    this.autoSyncInterval = null;
 
     this.init();
   }
@@ -115,6 +118,7 @@ class DisciplineApp {
   saveViolations() {
     localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
     this.updateBadges();
+    this.pushToCloud(true);
   }
 
   // Tính Tuần Học Đường: Tuần 1 bắt đầu từ 07/09/2026
@@ -361,6 +365,27 @@ class DisciplineApp {
     // Nút xuất & copy Nhật ký
     const btnCloudSync = document.getElementById('btn-cloud-sync');
     if (btnCloudSync) btnCloudSync.addEventListener('click', () => this.syncCloudData(false));
+
+    // Đồng bộ thời gian thực đa thiết bị: Tự động kéo dữ liệu khi chuyển tab hoặc mở lại trình duyệt
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        this.pullAndMergeFromCloud(true);
+      }
+    });
+
+    window.addEventListener('focus', () => {
+      this.pullAndMergeFromCloud(true);
+    });
+
+    window.addEventListener('online', () => {
+      this.syncCloudData(true);
+    });
+
+    // Vòng lặp định kỳ mỗi 15 giây tự động đồng bộ ngầm
+    if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
+    this.autoSyncInterval = setInterval(() => {
+      this.pullAndMergeFromCloud(true);
+    }, 15000);
 
     const btnCopyMdLogs = document.getElementById('btn-copy-markdown-logs');
     if (btnCopyMdLogs) btnCopyMdLogs.addEventListener('click', () => this.copyLogsMarkdown());
@@ -1176,7 +1201,8 @@ class DisciplineApp {
   deleteViolation(id) {
     this.requirePassword(() => {
       if (confirm('Bạn có muốn xóa bản ghi vi phạm này?')) {
-        this.violations = this.violations.filter(v => v.id !== id);
+        this.trackDeletedViolationId(id);
+        this.violations = this.violations.filter(v => String(v.id) !== String(id));
         this.saveViolations();
         this.renderLogsTable();
         this.renderEmulationTable();
@@ -1187,7 +1213,8 @@ class DisciplineApp {
 
   _oldDeleteViolation(id) {
     if (confirm('Bạn có muốn xóa bản ghi vi phạm này?')) {
-      this.violations = this.violations.filter(v => v.id !== id);
+      this.trackDeletedViolationId(id);
+      this.violations = this.violations.filter(v => String(v.id) !== String(id));
       this.saveViolations();
       this.renderLogsTable();
       this.renderEmulationTable();
@@ -1922,9 +1949,13 @@ class DisciplineApp {
     if (inputPass) {
       // Tắt triệt để tính năng gợi ý và lưu mật khẩu của trình duyệt
       inputPass.setAttribute('autocomplete', 'off');
+      inputPass.setAttribute('name', 'lhp_otp_token');
       inputPass.setAttribute('autocorrect', 'off');
       inputPass.setAttribute('autocapitalize', 'off');
       inputPass.setAttribute('spellcheck', 'false');
+      inputPass.setAttribute('data-lpignore', 'true');
+      inputPass.setAttribute('data-1p-ignore', 'true');
+      inputPass.setAttribute('data-form-type', 'other');
 
       // Tự động xóa viền đỏ khi người dùng bắt đầu gõ lại
       inputPass.addEventListener('input', () => {
@@ -1996,7 +2027,7 @@ class DisciplineApp {
     }
     if (icon) {
       icon.setAttribute('data-lucide', isUnlocked ? 'unlock' : 'lock');
-      icon.className = isUnlocked ? 'w-4 h-4 text-emerald-400 pointer-events-none' : 'w-4 h-4 text-amber-400 pointer-events-none';
+      icon.setAttribute('class', isUnlocked ? 'w-4 h-4 text-emerald-400 pointer-events-none' : 'w-4 h-4 text-amber-400 pointer-events-none');
     }
     if (btn) {
       btn.className = isUnlocked 
@@ -2036,13 +2067,14 @@ class DisciplineApp {
     const err = document.getElementById('password-error-msg');
     
     if (err) {
-      err.textContent = 'Sai mật khẩu';
+      err.textContent = 'Đăng nhập không thành công!';
       err.classList.add('hidden');
       err.style.display = 'none';
     }
     if (input) {
       input.value = '';
       input.setAttribute('autocomplete', 'off');
+      input.setAttribute('name', 'lhp_otp_token');
       input.classList.remove('border-red-500', 'bg-red-50');
       input.classList.add('border-slate-300');
     }
@@ -2067,10 +2099,11 @@ class DisciplineApp {
     if (err) {
       err.classList.add('hidden');
       err.style.display = 'none';
-      err.textContent = 'Sai mật khẩu';
+      err.textContent = 'Đăng nhập không thành công!';
     }
     if (input) {
       input.value = '';
+      input.setAttribute('autocomplete', 'off');
       input.classList.remove('border-red-500', 'bg-red-50');
       input.classList.add('border-slate-300');
     }
@@ -2083,24 +2116,30 @@ class DisciplineApp {
     const entered = (input ? input.value : '').trim();
 
     if (entered === this.PASSWORD_CONFIG) {
-      sessionStorage.setItem('data_entry_unlocked', 'true');
-      this.updateLockStatusUI();
-      
-      // 1. Hiển thị thông báo "Đăng nhập thành công"
-      this.showToast('Đăng nhập thành công!', 'success');
-      
-      // 2. Tự động đóng (ẩn) hộp thoại đăng nhập ngay lập tức
-      this.closePasswordModal();
+      try {
+        sessionStorage.setItem('data_entry_unlocked', 'true');
+        
+        // 1. Tự động đóng (ẩn) hộp thoại đăng nhập ngay lập tức không độ trễ
+        this.closePasswordModal();
 
-      if (typeof this.pendingAction === 'function') {
-        const action = this.pendingAction;
-        this.pendingAction = null;
-        action();
+        // 2. Cập nhật giao diện mở khóa
+        this.updateLockStatusUI();
+        
+        // 3. Hiển thị thông báo "Đăng nhập thành công"
+        this.showToast('Đăng nhập thành công!', 'success');
+
+        if (typeof this.pendingAction === 'function') {
+          const action = this.pendingAction;
+          this.pendingAction = null;
+          action();
+        }
+      } catch (err) {
+        console.error('LỖI trong submitPassword:', err);
       }
     } else {
-      // 3. Nếu sai mật khẩu, hiển thị rõ thông báo "Sai mật khẩu" trực tiếp trên box để người dùng biết
+      // 3. Nếu sai mật khẩu, hiển thị thông báo "Đăng nhập không thành công!" trực tiếp trên modal
       if (err) {
-        err.textContent = 'Sai mật khẩu';
+        err.textContent = 'Đăng nhập không thành công!';
         err.classList.remove('hidden');
         err.style.display = 'block';
       }
@@ -2110,7 +2149,7 @@ class DisciplineApp {
         input.select();
         input.focus();
       }
-      this.showToast('Sai mật khẩu! Vui lòng thử lại.', 'error');
+      this.showToast('Đăng nhập không thành công! Vui lòng thử lại.', 'error');
     }
   }
 
@@ -2143,13 +2182,16 @@ class DisciplineApp {
   loadDeletedViolationIds() {
     try {
       const saved = localStorage.getItem('dshs_deleted_violations_ids');
-      return new Set(saved ? JSON.parse(saved) : []);
+      return new Set(saved ? JSON.parse(saved).map(String) : []);
     } catch (e) {
       return new Set();
     }
   }
 
   trackDeletedViolationId(id) {
+    if (!this.deletedViolationIds) {
+      this.deletedViolationIds = new Set();
+    }
     if (!id) return;
     this.deletedViolationIds.add(String(id));
     try {
@@ -2194,10 +2236,17 @@ class DisciplineApp {
         method = 'PUT';
       }
 
+      const payload = {
+        version: 2,
+        updated_at: Date.now(),
+        violations: this.violations,
+        deleted_ids: Array.from(this.deletedViolationIds || [])
+      };
+
       const res = await fetch(cloudUrl, {
         method: method,
         headers: headers,
-        body: JSON.stringify(this.violations)
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
@@ -2223,36 +2272,61 @@ class DisciplineApp {
     const cloudUrl = this.getCloudUrl();
     if (!cloudUrl) return false;
 
+    // Giới hạn tần suất gọi tối thiểu 2 giây giữa các lần để tránh nghẽn mạng
+    const now = Date.now();
+    if (this._lastPullTime && (now - this._lastPullTime < 2000)) {
+      return false;
+    }
+    this._lastPullTime = now;
+
     try {
-      const res = await fetch(`${cloudUrl}?t=${Date.now()}`);
+      const res = await fetch(`${cloudUrl}?t=${now}`);
       if (!res.ok) {
         return false;
       }
 
-      let cloudData = await res.json();
-      if (!Array.isArray(cloudData)) {
-        if (cloudData && typeof cloudData === 'object') {
-          cloudData = Object.values(cloudData);
+      let data = await res.json();
+      let cloudViolations = [];
+      let cloudDeletedIds = [];
+
+      if (Array.isArray(data)) {
+        cloudViolations = data;
+      } else if (data && typeof data === 'object') {
+        if (Array.isArray(data.violations)) {
+          cloudViolations = data.violations;
+          if (Array.isArray(data.deleted_ids)) {
+            cloudDeletedIds = data.deleted_ids;
+          }
         } else {
-          cloudData = [];
+          cloudViolations = Object.values(data);
         }
       }
 
-      const localMap = new Map();
-      const deletedSet = this.deletedViolationIds;
+      // 1. Đồng bộ danh sách ID đã xóa từ Cloud về máy này
+      if (cloudDeletedIds.length > 0) {
+        cloudDeletedIds.forEach(id => {
+          if (id) this.deletedViolationIds.add(String(id));
+        });
+        localStorage.setItem('dshs_deleted_violations_ids', JSON.stringify(Array.from(this.deletedViolationIds)));
+      }
 
-      // 1. Nạp danh sách vi phạm cục bộ hiện hành (bỏ qua những id đã bị xóa)
+      // 2. Lọc bỏ các bản ghi cục bộ nếu đã bị xóa trên thiết bị khác
+      const initialCount = this.violations.length;
+      this.violations = this.violations.filter(v => v && v.id && !this.deletedViolationIds.has(String(v.id)));
+
+      // 3. Nạp danh sách vi phạm cục bộ hiện hành (bỏ qua những id đã bị xóa)
+      const localMap = new Map();
       this.violations.forEach(v => {
-        if (v && v.id && !deletedSet.has(String(v.id))) {
+        if (v && v.id && !this.deletedViolationIds.has(String(v.id))) {
           localMap.set(String(v.id), v);
         }
       });
 
       let hasNewFromCloud = false;
 
-      // 2. Hợp nhất dữ liệu mới từ Cloud (từ các thiết bị khác như điện thoại)
-      cloudData.forEach(cv => {
-        if (cv && cv.id && !deletedSet.has(String(cv.id))) {
+      // 4. Hợp nhất dữ liệu mới từ Cloud (từ các thiết bị khác như điện thoại)
+      cloudViolations.forEach(cv => {
+        if (cv && cv.id && !this.deletedViolationIds.has(String(cv.id))) {
           if (!localMap.has(String(cv.id))) {
             localMap.set(String(cv.id), cv);
             hasNewFromCloud = true;
@@ -2260,7 +2334,7 @@ class DisciplineApp {
         }
       });
 
-      // 3. Sắp xếp lại danh sách hợp nhất theo thứ tự thời gian/ID
+      // 5. Sắp xếp lại danh sách hợp nhất theo thứ tự thời gian/ID
       const mergedList = Array.from(localMap.values()).sort((a, b) => {
         const dateA = new Date(a.date || 0).getTime();
         const dateB = new Date(b.date || 0).getTime();
@@ -2269,11 +2343,12 @@ class DisciplineApp {
       });
 
       const oldCount = this.violations.length;
+      const dataChanged = hasNewFromCloud || (initialCount !== oldCount) || (mergedList.length !== oldCount);
       this.violations = mergedList;
       localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
       this.updateBadges();
 
-      if (hasNewFromCloud || mergedList.length !== oldCount) {
+      if (dataChanged) {
         this.renderLogsTable();
         this.renderEmulationTable();
         // Đẩy lại toàn bộ danh sách hợp nhất lên Cloud để 2 bên đồng nhất 100%
