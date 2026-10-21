@@ -2148,6 +2148,11 @@ class DisciplineApp {
     return items.reduce((sum, item) => sum + (parseFloat(item.points) || 0), 0);
   }
 
+  getBonusPointsList(weekNum) {
+    const w = String(weekNum);
+    return this.bonusPoints[w] || [];
+  }
+
   openBonusModal(weekNum = null, preselectedClass = '') {
     const emuSelect = document.getElementById('emulation-select-week');
     const w = weekNum !== null ? weekNum : (emuSelect ? emuSelect.value : this.currentWeek);
@@ -2633,6 +2638,10 @@ class DisciplineApp {
     `).join('');
 
     if (window.lucide) window.lucide.createIcons();
+  }
+
+  getSnapshots() {
+    return this.snapshots || [];
   }
 
   createSnapshot(name, desc = '', isAuto = false) {
