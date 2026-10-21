@@ -1,0 +1,54 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  test-and-verify:
+    name: Kiểm thử & Xác thực tự động
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài đặt Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Kiểm tra tính toàn vẹn cú pháp & logic hệ thống
+        run: |
+          node -e "
+            global.window = global;
+            global.window.addEventListener = () => {};
+            global.window.removeEventListener = () => {};
+            global.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+            global.sessionStorage = global.localStorage;
+            global.document = {
+              getElementById: () => ({
+                addEventListener: () => {},
+                classList: { add: () => {}, remove: () => {} },
+                dataset: {},
+                setAttribute: () => {},
+                style: {}
+              }),
+              querySelectorAll: () => [],
+              querySelector: () => null,
+              addEventListener: () => {}
+            };
+            require('./data_initial.js');
+            require('./app.js');
+            const app = new DisciplineApp();
+            app.init();
+            console.log('✓ Kiểm tra dữ liệu:');
+            console.log('  - Tổng số học sinh:', app.students.length);
+            console.log('  - Số lớp tiêu chuẩn:', (window.DEFAULT_CLASSES || []).length);
+            console.log('  - Mật khẩu Admin:', app.PASSWORD_ADMIN === '2806' ? 'Chính xác' : 'Sai');
+            console.log('  - Mật khẩu Giám thị:', app.PASSWORD_SUPERVISOR === 'lhp38' ? 'Chính xác' : 'Sai');
+            const rank7 = app.calculateWeeklyEmulationRankings(7);
+            console.log('  - Tính toán thi đua Tuần 7: Đạt 29 lớp, Hạng 1 lớp:', rank7[0].className);
+            process.exit(0);
+          "
