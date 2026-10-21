@@ -135,7 +135,7 @@
           <i data-lucide="users" class="w-4 h-4"></i>
           <span>Quản Lý Học Sinh</span>
           <span id="badge-total-students" class="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-bold">1226</span>
-          <span id="lock-badge-tab-students" class="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">🔒 Admin</span>
+          <span id="lock-badge-tab-students" class="hidden"></span>
         </button>
 
         <button data-tab="tab-rules" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
@@ -1501,7 +1501,7 @@
         <div class="relative mb-2">
           <input type="password" id="login-password" 
                  name="lhp_admin_auth_code"
-                 autocomplete="new-password"
+                 autocomplete="off"
                  autocorrect="off"
                  autocapitalize="off"
                  spellcheck="false"
@@ -1716,7 +1716,8 @@
         
         <div>
           <label class="block font-bold text-slate-700 mb-1">Họ và Tên Học Sinh <span class="text-rose-500">*</span></label>
-          <input type="text" id="edit-viol-student" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900">
+          <input type="text" id="edit-viol-student" list="edit-viol-students-datalist" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900" placeholder="Gõ tên học sinh để gợi ý...">
+          <datalist id="edit-viol-students-datalist"></datalist>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
@@ -1750,7 +1751,8 @@
 
         <div>
           <label class="block font-bold text-slate-700 mb-1">Nội dung vi phạm <span class="text-rose-500">*</span></label>
-          <input type="text" id="edit-viol-category" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium text-slate-900" placeholder="Ví dụ: Đi học muộn, Không mặc đồng phục...">
+          <input type="text" id="edit-viol-category" list="edit-viol-rules-datalist" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-medium text-slate-900" placeholder="Ví dụ: Đi học muộn, Không mặc đồng phục...">
+          <datalist id="edit-viol-rules-datalist"></datalist>
         </div>
 
         <div class="grid grid-cols-2 gap-3">

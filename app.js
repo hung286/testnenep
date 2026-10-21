@@ -656,17 +656,18 @@ class DisciplineApp {
   }
 
   switchTab(targetTab) {
-    const SENSITIVE_ADMIN_TABS = ['tab-students', 'tab-rules', 'tab-backup'];
+    // Tab Quản lý học sinh (tab-students) cho phép Khách xem và Giám thị thêm
+    // Chỉ các tab cấu hình hệ thống nhạy cảm mới bắt buộc quyền Quản trị Admin (2806)
+    const SENSITIVE_ADMIN_TABS = ['tab-rules', 'tab-backup'];
     if (SENSITIVE_ADMIN_TABS.includes(targetTab) && !this.isAdmin()) {
       let tabName = 'mục quản trị này';
-      if (targetTab === 'tab-students') tabName = 'Quản Lý Học Sinh';
-      else if (targetTab === 'tab-rules') tabName = 'Danh Mục Lỗi & Điểm';
+      if (targetTab === 'tab-rules') tabName = 'Danh Mục Lỗi & Điểm';
       else if (targetTab === 'tab-backup') tabName = 'Sao Lưu & Bảo Vệ Dữ Liệu';
 
       const isSuper = this.isSupervisor();
       const msg = isSuper
         ? `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin cấp cao (Mật khẩu: 2806). Bạn đang ở quyền Giám thị / Cờ đỏ!`
-        : `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin. Vui lòng nhập mật khẩu Admin để truy cập!`;
+        : `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin (Mật khẩu: 2806). Vui lòng đăng nhập Admin để truy cập!`;
 
       this.showToast(msg, 'warning');
       this.openPasswordModal(() => {
@@ -2092,6 +2093,16 @@ class DisciplineApp {
       document.getElementById('edit-viol-points').value = v.penalty_points !== undefined ? v.penalty_points : 0.5;
       document.getElementById('edit-viol-note').value = v.original_note || '';
 
+      // Tự động nạp gợi ý danh sách học sinh và danh mục lỗi cho modal chỉnh sửa
+      const stuDatalist = document.getElementById('edit-viol-students-datalist');
+      if (stuDatalist) {
+        stuDatalist.innerHTML = (this.students || []).slice(0, 150).map(s => `<option value="${s.name}">Lớp ${s.class}</option>`).join('');
+      }
+      const ruleDatalist = document.getElementById('edit-viol-rules-datalist');
+      if (ruleDatalist) {
+        ruleDatalist.innerHTML = (this.rules || []).map(r => `<option value="${r.name}">-${r.points}đ</option>`).join('');
+      }
+
       modal.classList.remove('hidden');
       if (window.lucide) window.lucide.createIcons();
     });
@@ -2508,8 +2519,8 @@ class DisciplineApp {
                 <i data-lucide="shield-alert" class="w-4 h-4"></i>
               </div>
               <div>
-                <p class="font-extrabold text-amber-950 text-xs sm:text-sm">Chế độ Bảo mật: Đang ở trạng thái CHỈ XEM (Read-only)</p>
-                <p class="text-[11px] text-amber-800 mt-0.5">Toàn bộ tính năng Thêm, Sửa, Xóa, Nhập điểm, Import file và Khóa/Mở tuần đều bị vô hiệu hóa an toàn. Vui lòng bấm đăng nhập để chuyển sang chế độ quản trị hoặc nề nếp.</p>
+                <p class="font-extrabold text-amber-950 text-xs sm:text-sm">Chế độ Bảo mật: CẤP ĐỘ 1 - CHỈ XEM (Khách / Người xem)</p>
+                <p class="text-[11px] text-amber-800 mt-0.5">Thầy/cô và phụ huynh có quyền xem bảng tổng hợp thi đua, xem báo cáo, xem danh sách học sinh vi phạm và xem danh sách học sinh toàn trường. Các tính năng chỉnh sửa đều bị khóa an toàn.</p>
               </div>
             </div>
             <button type="button" onclick="window.app.openPasswordModal()" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold rounded-xl text-xs transition cursor-pointer flex-shrink-0 flex items-center justify-center gap-1.5 shadow-xs">
@@ -2526,8 +2537,8 @@ class DisciplineApp {
                 <i data-lucide="shield-check" class="w-4 h-4"></i>
               </div>
               <div>
-                <p class="font-extrabold text-emerald-950">Quyền Quản Trị Cấp Cao Đang Kích Hoạt (Admin)</p>
-                <p class="text-[11px] text-emerald-800">Thầy/cô có toàn quyền Thêm, Sửa, Xóa, Nhập điểm trực tiếp, Import file và Mở khóa toàn bộ các tuần (1 đến 6).</p>
+                <p class="font-extrabold text-emerald-950">CẤP ĐỘ 3 - QUẢN TRỊ ADMIN CẤP CAO ĐANG KÍCH HOẠT (Mật khẩu: 2806)</p>
+                <p class="text-[11px] text-emerald-800">Toàn quyền hệ thống: Mở/khóa các tuần từ 1 đến 6, Quản lý danh mục lỗi, Quản lý học sinh, Sao lưu dữ liệu và toàn bộ quyền của Giám thị.</p>
               </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
@@ -2549,8 +2560,8 @@ class DisciplineApp {
                 <i data-lucide="flag" class="w-4 h-4"></i>
               </div>
               <div>
-                <p class="font-extrabold text-indigo-950">Quyền Giám Thị / Đội Cờ Đỏ Đang Hoạt Động</p>
-                <p class="text-[11px] text-indigo-800">Thầy/cô và ban nề nếp có quyền ghi nhận, chấm điểm vi phạm học sinh và cập nhật nề nếp thi đua.</p>
+                <p class="font-extrabold text-indigo-950">CẤP ĐỘ 2 - GIÁM THỊ / ĐỘI CỜ ĐỎ ĐANG HOẠT ĐỘNG</p>
+                <p class="text-[11px] text-indigo-800">Thầy/cô có quyền: Thêm danh sách học sinh, Thêm/Sửa/Xóa vi phạm trong tuần đang mở. Mọi thay đổi tự động đồng bộ thời gian thực qua bảng thi đua.</p>
               </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
@@ -4606,6 +4617,7 @@ class DisciplineApp {
   setupPasswordAuth() {
     this.PASSWORD_CONFIG = "2806";
     this.pendingAction = null;
+    this.currentModalRequireAdmin = false;
 
     const btnToggleLock = document.getElementById('btn-toggle-auth-lock');
     const modalPass = document.getElementById('modal-login-password');
@@ -4806,11 +4818,16 @@ class DisciplineApp {
     if (btnUnlockAllWeeks) btnUnlockAllWeeks.style.display = isAdmin ? 'inline-flex' : 'none';
     if (btnManageWeeks) btnManageWeeks.style.display = isAdmin ? 'inline-flex' : 'none';
 
-    // 4. Tab 4: Ẩn / Hiện nút Thêm / Import học sinh: CHỈ DÀNH CHO ADMIN
-    ['btn-open-add-student', 'btn-open-import-students', 'btn-reset-default-students'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = isAdmin ? 'inline-flex' : 'none';
-    });
+    // 4. Tab 4 (Quản Lý Học Sinh):
+    // Giám thị (Level 2) và Admin (Level 3) ĐƯỢC PHÉP Thêm học sinh và Import học sinh
+    const btnAddStudent = document.getElementById('btn-open-add-student');
+    const btnImportStudent = document.getElementById('btn-open-import-students');
+    const btnResetStudent = document.getElementById('btn-reset-default-students');
+
+    if (btnAddStudent) btnAddStudent.style.display = isSupervisor ? 'inline-flex' : 'none';
+    if (btnImportStudent) btnImportStudent.style.display = isSupervisor ? 'inline-flex' : 'none';
+    // Nút khôi phục 1.226 học sinh gốc CHỈ dành cho Admin cấp cao
+    if (btnResetStudent) btnResetStudent.style.display = isAdmin ? 'inline-flex' : 'none';
 
     // 5. Tab 5: Ẩn / Hiện nút Thêm / Reset nội quy: CHỈ DÀNH CHO ADMIN
     ['btn-open-add-rule', 'btn-reset-default-rules'].forEach(id => {
@@ -4834,12 +4851,25 @@ class DisciplineApp {
     if (window.lucide) window.lucide.createIcons();
   }
 
-  openPasswordModal(onSuccess = null) {
+  openPasswordModal(onSuccess = null, requireAdmin = false) {
     this.pendingAction = onSuccess;
+    this.currentModalRequireAdmin = Boolean(requireAdmin);
     const modal = document.getElementById('modal-login-password');
     const input = document.getElementById('login-password');
     const err = document.getElementById('password-error-msg');
+    const title = document.getElementById('login-password-modal-title');
+    const subtitle = document.getElementById('login-password-modal-subtitle');
     
+    if (title && subtitle) {
+      if (this.currentModalRequireAdmin) {
+        title.textContent = 'Xác Thực Quản Trị Admin Cấp Cao';
+        subtitle.textContent = 'Mục này yêu cầu quyền Quản trị Admin (Mật khẩu: 2806) để cấu hình, mở/khóa tuần hoặc sao lưu hệ thống.';
+      } else {
+        title.textContent = 'Đăng Nhập Ban Nền Nếp & Quản Trị';
+        subtitle.textContent = 'Nhập mật khẩu Quản trị Admin (2806) hoặc Giám thị / Đội cờ đỏ (lhp38).';
+      }
+    }
+
     if (err) {
       err.textContent = 'Đăng nhập không thành công!';
       err.classList.add('hidden');
@@ -4847,8 +4877,8 @@ class DisciplineApp {
     }
     if (input) {
       input.value = '';
-      input.setAttribute('autocomplete', 'new-password');
-      input.setAttribute('name', 'admin_auth_code_' + Math.random().toString(36).slice(2));
+      input.setAttribute('autocomplete', 'off');
+      input.setAttribute('name', 'auth_code_no_suggest_' + Math.random().toString(36).slice(2));
       input.setAttribute('data-lpignore', 'true');
       input.setAttribute('data-1p-ignore', 'true');
       input.classList.remove('border-red-500', 'bg-red-50');
@@ -4858,7 +4888,10 @@ class DisciplineApp {
       modal.classList.remove('hidden');
       modal.style.display = 'flex';
       setTimeout(() => {
-        if (input) input.focus();
+        if (input) {
+          input.focus();
+          input.select();
+        }
       }, 100);
     }
   }
@@ -4884,6 +4917,7 @@ class DisciplineApp {
       input.classList.add('border-slate-300');
     }
     this.pendingAction = null;
+    this.currentModalRequireAdmin = false;
   }
 
   submitPassword() {
@@ -4941,6 +4975,7 @@ class DisciplineApp {
         if (typeof this.pendingAction === 'function') {
           const action = this.pendingAction;
           this.pendingAction = null;
+    this.currentModalRequireAdmin = false;
           action();
         }
       } catch (err) {
