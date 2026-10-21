@@ -14,6 +14,9 @@ class DisciplineApp {
     this.deletedViolationIds = this.loadDeletedViolationIds();
     this.lockedWeeks = this.loadLockedWeeks();
     this.currentWeek = 7;
+    this.PASSWORD_ADMIN = "2806";
+    this.PASSWORD_SUPERVISOR = "lhp38";
+    this.currentModalRequireAdmin = false;
     
     // Nạp Bảng thi đua, Điểm cộng & Snapshots sao lưu
     this.emulationWeeks = this.loadEmulationWeeks();
@@ -78,6 +81,65 @@ class DisciplineApp {
       return 'Nữ';
     }
     return 'Nam';
+  }
+
+  autoFitWorksheetColumns(ws, minWidths = {}, padding = 3) {
+    const colLetterToIndex = (col) => {
+      let num = 0;
+      for (let i = 0; i < col.length; i++) {
+        num = num * 26 + (col.charCodeAt(i) - 64);
+      }
+      return num - 1;
+    };
+    const indexToColLetter = (idx) => {
+      let temp = idx;
+      let letter = '';
+      while (temp >= 0) {
+        letter = String.fromCharCode((temp % 26) + 65) + letter;
+        temp = Math.floor(temp / 26) - 1;
+      }
+      return letter;
+    };
+
+    const maxLenPerCol = {};
+
+    for (let cellRef in ws) {
+      if (cellRef.startsWith('!')) continue;
+      const match = cellRef.match(/^([A-Z]+)([0-9]+)$/);
+      if (!match) continue;
+      const colStr = match[1];
+      const rowNum = parseInt(match[2], 10);
+
+      // Bỏ qua các dòng tiêu đề gộp ô đầu trang (Row 1 đến Row 5)
+      if (rowNum <= 5) continue;
+
+      const cell = ws[cellRef];
+      if (!cell) continue;
+
+      let textLen = 0;
+      if (cell.v !== undefined && cell.v !== null) {
+        const str = String(cell.v);
+        const lines = str.split('\n');
+        textLen = Math.max(...lines.map(l => l.length));
+      }
+      maxLenPerCol[colStr] = Math.max(maxLenPerCol[colStr] || 0, textLen);
+    }
+
+    let maxColIdx = 20;
+    for (let colStr in maxLenPerCol) {
+      maxColIdx = Math.max(maxColIdx, colLetterToIndex(colStr));
+    }
+
+    const cols = [];
+    for (let i = 0; i <= maxColIdx; i++) {
+      const colStr = indexToColLetter(i);
+      const contentLen = maxLenPerCol[colStr] || 0;
+      const minW = minWidths[colStr] !== undefined ? minWidths[colStr] : (minWidths[i] !== undefined ? minWidths[i] : 8);
+      const width = Math.max(minW, contentLen + padding);
+      cols[i] = { wch: width };
+    }
+
+    return cols;
   }
 
   sortViolations(list) {
@@ -1932,17 +1994,18 @@ class DisciplineApp {
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [
-      { wch: 6 },   // STT
-      { wch: 10 },  // Lớp
-      { wch: 26 },  // Họ và Tên
-      { wch: 10 },  // Giới tính
-      { wch: 14 },  // Ngày
-      { wch: 8 },   // Tuần
-      { wch: 32 },  // Nội dung vi phạm
-      { wch: 10 },  // Điểm trừ
-      { wch: 30 }   // Ghi chú
-    ];
+    const minWidthsLogs = {
+      0: 6,   // STT
+      1: 10,  // Lớp
+      2: 26,  // Họ và Tên
+      3: 12,  // Giới tính
+      4: 16,  // Ngày vi phạm
+      5: 8,   // Tuần
+      6: 32,  // Nội dung vi phạm
+      7: 12,  // Điểm trừ
+      8: 30   // Ghi chú
+    };
+    ws['!cols'] = this.autoFitWorksheetColumns(ws, minWidthsLogs, 3);
 
     const wb = XLSX.utils.book_new();
     const sheetTitle = weekFilter !== 'all' ? `ViPham_T${weekFilter}` : 'DS_ViPham_Lop_A-Z';
@@ -3013,10 +3076,11 @@ class DisciplineApp {
     };
 
     const encodeCell = (r, c) => XLSX.utils.encode_cell({ r, c });
-    const setCell = (r, c, val, type = 's', formula = null, style = styleDataCenter) => {
+    const setCell = (r, c, val, type = 's', formula = null, style = styleDataCenter, numFmt = null) => {
       const ref = encodeCell(r, c);
       const cell = { t: type, v: val };
       if (formula) cell.f = formula;
+      if (numFmt) cell.z = numFmt;
       if (style) cell.s = style;
       ws[ref] = cell;
     };
@@ -3066,7 +3130,22 @@ class DisciplineApp {
       const rowIdx = 8 + idx;
       const rowNum = rowIdx + 1;
 
-      setCell(rowIdx, 0, r.stt, 'n', null, styleDataCenter);
+      // Ép kiểu tường minh tất cả các giá trị số sang Number
+      const valTot = Number(r.tot) || 0;
+      const valGioA = Number(r.gioA) || 0;
+      const valGioB = Number(r.gioB) || 0;
+      const valGioC = Number(r.gioC) || 0;
+      const valGioD = Number(r.gioD) || 0;
+      const valTongTiet = Number(r.tongTiet) || (valTot + valGioA + valGioB + valGioC + valGioD);
+      const valDiem15 = Number(r.diem15) || 0;
+      const valDiemTru = Number(r.diemTru) || 0;
+      const valTbNn = Number(r.tbNenNep) !== undefined ? Number(r.tbNenNep) : (valDiem15 - valDiemTru);
+      const valHsVang = Number(r.hsVang) || 0;
+      const valBonus = Number(r.bonus) || 0;
+      const valTbHocTap = Number(r.diemTbHocTap) !== undefined ? Number(r.diemTbHocTap) : 10;
+      const valTbChung = Number(r.tbChung) !== undefined ? Number(r.tbChung) : ((valTbHocTap + valTbNn) / 2 + valBonus);
+
+      setCell(rowIdx, 0, Number(r.stt) || (idx + 1), 'n', null, styleDataCenter, '0');
       setCell(rowIdx, 1, r.className, 's', null, styleDataCenterBold);
 
       // Tách GVCN thành Họ đệm (Col C) và Tên (Col D)
@@ -3076,47 +3155,56 @@ class DisciplineApp {
       setCell(rowIdx, 2, gvcnHo, 's', null, styleDataLeft);
       setCell(rowIdx, 3, gvcnTen, 's', null, styleDataLeft);
 
-      // Giờ ABCD
-      setCell(rowIdx, 4, r.tot || '', r.tot ? 'n' : 's', null, styleDataCenter);
-      setCell(rowIdx, 5, r.gioA || '', r.gioA ? 'n' : 's', null, styleDataCenter);
-      setCell(rowIdx, 6, r.gioB || '', r.gioB ? 'n' : 's', null, styleDataCenter);
-      setCell(rowIdx, 7, r.gioC || '', r.gioC ? 'n' : 's', null, styleDataCenter);
-      setCell(rowIdx, 8, r.gioD || '', r.gioD ? 'n' : 's', null, styleDataCenter);
+      // Giờ ABCD: luôn lưu dạng số 'n' với định dạng '0;-0;""' để số 0 hiển thị trống hoặc '0', triệt tiêu hoàn toàn #VALUE!
+      setCell(rowIdx, 4, valTot, 'n', null, styleDataCenter, '0;-0;""');
+      setCell(rowIdx, 5, valGioA, 'n', null, styleDataCenter, '0;-0;""');
+      setCell(rowIdx, 6, valGioB, 'n', null, styleDataCenter, '0;-0;""');
+      setCell(rowIdx, 7, valGioC, 'n', null, styleDataCenter, '0;-0;""');
+      setCell(rowIdx, 8, valGioD, 'n', null, styleDataCenter, '0;-0;""');
 
-      // Tổng tiết & Điểm TB & Vị thứ Học tập (Có công thức live)
-      setCell(rowIdx, 9, r.tongTiet, 'n', `SUM(E${rowNum}:I${rowNum})`, styleDataCenterBold);
-      setCell(rowIdx, 10, r.diemTbHocTap, 'n', `SUM((E${rowNum}*15)+(F${rowNum}*10)+(G${rowNum}*5)+(H${rowNum}*0)+(I${rowNum}*-5))/J${rowNum}`, styleDataCenterBold);
-      setCell(rowIdx, 11, r.viThuHocTap, 'n', `RANK(K${rowNum},$K$9:$K$37)`, styleDataCenterBold);
+      // Tổng tiết & Điểm TB & Vị thứ Học tập
+      setCell(rowIdx, 9, valTongTiet, 'n', `SUM(E${rowNum}:I${rowNum})`, styleDataCenterBold, '0');
+      
+      // Bọc hàm N() chống lỗi #VALUE! khi ô rỗng và IF tránh chia cho 0
+      const tbHocTapFormula = `IF(J${rowNum}>0,((N(E${rowNum})*15)+(N(F${rowNum})*10)+(N(G${rowNum})*5)+(N(H${rowNum})*0)+(N(I${rowNum})*-5))/J${rowNum},10)`;
+      setCell(rowIdx, 10, valTbHocTap, 'n', tbHocTapFormula, styleDataCenterBold, '0.000');
+      setCell(rowIdx, 11, Number(r.viThuHocTap) || 1, 'n', `RANK(K${rowNum},$K$9:$K$37)`, styleDataCenterBold, '0');
 
       // Nề nếp (15', Điểm trừ, TB NN, Vị thứ NN)
-      setCell(rowIdx, 12, r.diem15, 'n', null, styleDataCenter);
-      setCell(rowIdx, 13, r.diemTru, 'n', null, styleDataCenterBold);
-      setCell(rowIdx, 14, r.tbNenNep, 'n', `M${rowNum}-N${rowNum}`, styleDataCenterBold);
-      setCell(rowIdx, 15, r.viThuNenNep, 'n', `RANK(O${rowNum},$O$9:$O$37)`, styleDataCenterBold);
+      setCell(rowIdx, 12, valDiem15, 'n', null, styleDataCenter, '0.0');
+      setCell(rowIdx, 13, valDiemTru, 'n', null, styleDataCenterBold, '0.0');
+      setCell(rowIdx, 14, valTbNn, 'n', `N(M${rowNum})-N(N${rowNum})`, styleDataCenterBold, '0.00');
+      setCell(rowIdx, 15, Number(r.viThuNenNep) || 1, 'n', `RANK(O${rowNum},$O$9:$O$37)`, styleDataCenterBold, '0');
 
-      // HS Vắng
-      setCell(rowIdx, 16, r.hsVang || '', r.hsVang ? 'n' : 's', null, styleDataCenter);
-      setCell(rowIdx, 17, r.viThuVang, 'n', `RANK(Q${rowNum},$Q$9:$Q$37,1)`, styleDataCenter);
+      // HS Vắng & Vị thứ Vắng (bắt buộc dạng số 'n' để hàm RANK không lỗi #VALUE!)
+      setCell(rowIdx, 16, valHsVang, 'n', null, styleDataCenter, '0');
+      setCell(rowIdx, 17, Number(r.viThuVang) || 1, 'n', `RANK(Q${rowNum},$Q$9:$Q$37,1)`, styleDataCenter, '0');
 
-      // TB Chung, Xếp loại, Vị thứ Chung cuộc
-      const bonusPts = r.bonus || 0;
-      const tbChungFormula = bonusPts > 0 ? `(K${rowNum}+O${rowNum})/2+${bonusPts}` : `(K${rowNum}+O${rowNum})/2`;
-      setCell(rowIdx, 18, r.tbChung, 'n', tbChungFormula, styleDataCenterBold);
-      const xepLoaiFormula = `IF(S${rowNum}>=10,"X sắc",IF(AND(S${rowNum}>=9,S${rowNum}<10),"Giỏi",IF(AND(S${rowNum}>=7.5,S${rowNum}<9),"Khá",IF(AND(S${rowNum}>=6.5,S${rowNum}<7.5),"T.bình",IF(AND(S${rowNum}>=5,S${rowNum}<6.5),"Yếu","Kém")))))`;
-      setCell(rowIdx, 19, r.xepLoai, 's', xepLoaiFormula, styleDataCenterBold);
-      setCell(rowIdx, 20, r.viThuChung, 'n', `RANK(S${rowNum},$S$9:$S$37)`, styleDataCenterBold);
+      // TB Chung: ((Điểm TB + TB NN)/2) + Điểm cộng
+      const tbChungFormula = valBonus > 0 
+        ? `((N(K${rowNum})+N(O${rowNum}))/2)+${valBonus}` 
+        : `((N(K${rowNum})+N(O${rowNum}))/2)`;
+      setCell(rowIdx, 18, valTbChung, 'n', tbChungFormula, styleDataCenterBold, '0.000');
+
+      // Xếp loại chuẩn cấu trúc
+      const xepLoaiFormula = `IF(S${rowNum}>=10,"X sắc",IF(S${rowNum}>=9,"Giỏi",IF(S${rowNum}>=7.5,"Khá",IF(S${rowNum}>=6.5,"T.bình",IF(S${rowNum}>=5,"Yếu","Kém")))))`;
+      setCell(rowIdx, 19, r.xepLoai || 'Kém', 's', xepLoaiFormula, styleDataCenterBold);
+
+      // Vị thứ Chung cuộc
+      setCell(rowIdx, 20, Number(r.viThuChung) || 1, 'n', `RANK(S${rowNum},$S$9:$S$37)`, styleDataCenterBold, '0');
     });
 
     // 5. Hàng Tổng giờ dạy học tập (Row 38, r=37)
     for (let c = 0; c <= 20; c++) {
       setCell(37, c, '', 's', null, styleDataCenterBold);
     }
-    setCell(37, 4, ranked.reduce((s, r) => s + r.tot, 0), 'n', 'SUM(E9:E37)', styleDataCenterBold);
-    setCell(37, 5, ranked.reduce((s, r) => s + r.gioA, 0), 'n', 'SUM(F9:F37)', styleDataCenterBold);
-    setCell(37, 6, ranked.reduce((s, r) => s + r.gioB, 0), 'n', 'SUM(G9:G37)', styleDataCenterBold);
-    setCell(37, 7, ranked.reduce((s, r) => s + r.gioC, 0), 'n', 'SUM(H9:H37)', styleDataCenterBold);
-    setCell(37, 8, ranked.reduce((s, r) => s + r.gioD, 0), 'n', 'SUM(I9:I37)', styleDataCenterBold);
-    setCell(37, 9, ranked.reduce((s, r) => s + r.tongTiet, 0), 'n', 'SUM(J9:J37)', styleDataCenterBold);
+    setCell(37, 1, 'Tổng cộng', 's', null, styleDataCenterBold);
+    setCell(37, 4, ranked.reduce((s, r) => s + (Number(r.tot) || 0), 0), 'n', 'SUM(E9:E37)', styleDataCenterBold, '0');
+    setCell(37, 5, ranked.reduce((s, r) => s + (Number(r.gioA) || 0), 0), 'n', 'SUM(F9:F37)', styleDataCenterBold, '0');
+    setCell(37, 6, ranked.reduce((s, r) => s + (Number(r.gioB) || 0), 0), 'n', 'SUM(G9:G37)', styleDataCenterBold, '0');
+    setCell(37, 7, ranked.reduce((s, r) => s + (Number(r.gioC) || 0), 0), 'n', 'SUM(H9:H37)', styleDataCenterBold, '0');
+    setCell(37, 8, ranked.reduce((s, r) => s + (Number(r.gioD) || 0), 0), 'n', 'SUM(I9:I37)', styleDataCenterBold, '0');
+    setCell(37, 9, ranked.reduce((s, r) => s + (Number(r.tongTiet) || 0), 0), 'n', 'SUM(J9:J37)', styleDataCenterBold, '0');
 
     // 6. Khối Tổng Hợp Chung & Ghi Chú Dưới Bảng (Row 39 to 47, r=38 to 46)
     setCell(38, 0, 'TỔNG HỢP CHUNG', 's', null, styleSummaryLabel);
@@ -3141,10 +3229,10 @@ class DisciplineApp {
 
     summaryRows.forEach((row, i) => {
       const rIdx = 40 + i;
-      setCell(rIdx, 0, row.tt, 'n', null, styleDataCenter);
+      setCell(rIdx, 0, row.tt, 'n', null, styleDataCenter, '0');
       setCell(rIdx, 1, row.name, 's', null, styleSummaryLabel);
       for (let c = 2; c <= 4; c++) setCell(rIdx, c, '', 's', null, styleSummaryLabel);
-      setCell(rIdx, 5, row.val, 'n', row.f, styleSummaryVal);
+      setCell(rIdx, 5, row.val, 'n', row.f, styleSummaryVal, '0');
       setCell(rIdx, 6, '', 's', null, styleSummaryVal);
     });
 
@@ -3193,30 +3281,31 @@ class DisciplineApp {
       { s: { r: 46, c: 5 }, e: { r: 46, c: 6 } }
     ];
 
-    // 8. Thiết lập độ rộng cột (Column widths)
-    ws['!cols'] = [
-      { wch: 4 },  // A: TT
-      { wch: 8 },  // B: LỚP
-      { wch: 16 }, // C: GVCN Họ
-      { wch: 8 },  // D: GVCN Tên
-      { wch: 5 },  // E: Tốt
-      { wch: 5 },  // F: A
-      { wch: 4 },  // G: B
-      { wch: 4 },  // H: C
-      { wch: 4 },  // I: D
-      { wch: 7 },  // J: Tổng tiết
-      { wch: 8 },  // K: Điểm TB
-      { wch: 6 },  // L: Vị thứ
-      { wch: 6 },  // M: 15'
-      { wch: 7 },  // N: Điểm trừ
-      { wch: 6 },  // O: TB NN
-      { wch: 6 },  // P: Vị thứ
-      { wch: 6 },  // Q: HS vắng
-      { wch: 5 },  // R: TT vắng
-      { wch: 8 },  // S: TB Chung
-      { wch: 8 },  // T: Xếp loại
-      { wch: 6 }   // U: Vị thứ
-    ];
+    // 8. Tự động căn chỉnh độ rộng cột (Auto-Fit Column Widths) triệt tiêu hoàn toàn lỗi ######
+    const minWidthsEmu = {
+      0: 6,   // A: TT
+      1: 10,  // B: LỚP
+      2: 18,  // C: GVCN Họ
+      3: 10,  // D: GVCN Tên
+      4: 8,   // E: Tốt
+      5: 8,   // F: A
+      6: 8,   // G: B
+      7: 8,   // H: C
+      8: 8,   // I: D
+      9: 11,  // J: Tổng tiết
+      10: 12, // K: Điểm TB
+      11: 8,  // L: Vị thứ
+      12: 9,  // M: 15'
+      13: 11, // N: Điểm trừ
+      14: 11, // O: TB NN
+      15: 8,  // P: Vị thứ
+      16: 10, // Q: HS vắng
+      17: 8,  // R: TT vắng
+      18: 13, // S: TB Chung
+      19: 12, // T: Xếp loại
+      20: 8   // U: Vị thứ
+    };
+    ws['!cols'] = this.autoFitWorksheetColumns(ws, minWidthsEmu, 3);
 
     const maxRow = Math.max(47, 40 + (bonusList ? bonusList.length : 0));
     ws['!ref'] = `A1:U${maxRow}`;
@@ -3268,16 +3357,17 @@ class DisciplineApp {
       });
     }
 
-    wsV['!cols'] = [
-      { wch: 6 },   // STT
-      { wch: 10 },  // Lớp
-      { wch: 26 },  // Họ và Tên
-      { wch: 10 },  // Giới tính
-      { wch: 14 },  // Ngày
-      { wch: 32 },  // Lỗi vi phạm
-      { wch: 10 },  // Điểm trừ
-      { wch: 30 }   // Ghi chú
-    ];
+    const minWidthsV = {
+      0: 6,   // STT
+      1: 10,  // Lớp
+      2: 26,  // Họ và Tên
+      3: 12,  // Giới tính
+      4: 16,  // Ngày
+      5: 32,  // Lỗi vi phạm
+      6: 12,  // Điểm trừ
+      7: 30   // Ghi chú
+    };
+    wsV['!cols'] = this.autoFitWorksheetColumns(wsV, minWidthsV, 3);
     wsV['!ref'] = `A1:H${vRowIdx + 2}`;
     XLSX.utils.book_append_sheet(wb, wsV, `ViPham_T${emuWeek}`);
 
