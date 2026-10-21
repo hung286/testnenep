@@ -65,6 +65,46 @@ class DisciplineApp {
     this.updateBadges();
   }
 
+  getStudentGender(name, className) {
+    if (!name) return 'Nam';
+    const students = this.students || window.DEFAULT_STUDENTS || [];
+    const s = students.find(x => 
+      (x.name && x.name.toLowerCase() === name.toLowerCase()) && 
+      (!className || x.class === className || x.class_name === className)
+    );
+    if (s && s.gender) return s.gender;
+    const lower = name.toLowerCase();
+    if (lower.includes('thị') || lower.includes('ngọc') || lower.includes('nhi') || lower.includes('hương') || lower.includes('trâm') || lower.includes('vy') || lower.includes('hân')) {
+      return 'Nữ';
+    }
+    return 'Nam';
+  }
+
+  sortViolations(list) {
+    if (!list || !Array.isArray(list)) return [];
+    return [...list].sort((a, b) => {
+      // 1. Sắp xếp thứ tự Lớp tăng dần từ A -> Z (10B01 -> 12C09)
+      const classA = a.class_name || '';
+      const classB = b.class_name || '';
+      const cmpClass = classA.localeCompare(classB, 'vi', { numeric: true });
+      if (cmpClass !== 0) return cmpClass;
+
+      // 2. Trong cùng một lớp, sắp xếp tên học sinh theo thứ tự A -> Z
+      const nameA = a.student_name || '';
+      const nameB = b.student_name || '';
+      const cmpName = nameA.localeCompare(nameB, 'vi');
+      if (cmpName !== 0) return cmpName;
+
+      // 3. Ngày vi phạm
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      const cmpDate = dateA.localeCompare(dateB);
+      if (cmpDate !== 0) return cmpDate;
+
+      return (a.id || 0) - (b.id || 0);
+    });
+  }
+
   loadViolations() {
     let violations = [];
     const saved = localStorage.getItem('dshs_violations');
@@ -91,11 +131,20 @@ class DisciplineApp {
         const defW6 = window.DEFAULT_VIOLATIONS.filter(v => parseInt(v.week, 10) === 6);
         if (defW6.length > 0) {
           violations = violations.concat(defW6);
-          try { localStorage.setItem('dshs_violations', JSON.stringify(violations)); } catch (e) {}
         }
       }
     }
-    return violations;
+
+    // Đảm bảo toàn bộ học sinh có giới tính và được sắp xếp khoa học theo Lớp A -> Z
+    violations.forEach(v => {
+      if (!v.gender) {
+        v.gender = this.getStudentGender(v.student_name, v.class_name);
+      }
+    });
+
+    const sorted = this.sortViolations(violations);
+    try { localStorage.setItem('dshs_violations', JSON.stringify(sorted)); } catch (e) {}
+    return sorted;
   }
 
   saveViolations() {
@@ -796,6 +845,11 @@ class DisciplineApp {
 
     const btnExportExcelEmu = document.getElementById('btn-export-excel-emulation');
     if (btnExportExcelEmu) btnExportExcelEmu.addEventListener('click', () => this.exportEmulationExcel());
+
+    const btnViewWeeklyViolations = document.getElementById('btn-view-weekly-violations');
+    if (btnViewWeeklyViolations) {
+      btnViewWeeklyViolations.addEventListener('click', () => this.viewWeeklyViolations());
+    }
 
     // Quản lý khóa / mở tuần
     const btnToggleWeekLock = document.getElementById('btn-toggle-week-lock');
@@ -1728,7 +1782,10 @@ class DisciplineApp {
     }
 
     emptyState.classList.add('hidden');
-    tbody.innerHTML = filtered.map((v, idx) => {
+    // Tự động sắp xếp theo Lớp từ A -> Z và Tên học sinh
+    const sortedFiltered = this.sortViolations(filtered);
+
+    tbody.innerHTML = sortedFiltered.map((v, idx) => {
       const isLocked = this.isWeekLocked(v.week);
       let weekBadge = `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">T${v.week}</span>`;
       const isAuth = this.isDataEntryUnlocked();
@@ -1755,15 +1812,21 @@ class DisciplineApp {
         `;
       }
 
+      const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
+      const genderBadge = gender === 'Nữ'
+        ? `<span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full text-xs font-semibold">Nữ</span>`
+        : `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-semibold">Nam</span>`;
+
       return `
         <tr class="hover:bg-slate-50 transition border-b border-slate-100">
           <td class="text-center font-bold text-slate-500">${idx + 1}</td>
-          <td class="text-center">${weekBadge}</td>
-          <td class="font-medium text-slate-700">${this.formatDate(v.date)}</td>
-          <td class="font-bold text-slate-900">${v.student_name}</td>
           <td class="text-center">
-            <span class="font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded text-xs">${v.class_name}</span>
+            <span class="font-bold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded text-xs border border-slate-200">${v.class_name}</span>
           </td>
+          <td class="font-bold text-slate-900">${v.student_name}</td>
+          <td class="text-center">${genderBadge}</td>
+          <td class="text-center font-medium text-slate-700 text-xs">${this.formatDate(v.date)}</td>
+          <td class="text-center">${weekBadge}</td>
           <td class="font-semibold text-slate-800">${v.violation_category}</td>
           <td class="text-center">
             <span class="text-red-600 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded text-xs">-${v.penalty_points}đ</span>
@@ -1834,22 +1897,54 @@ class DisciplineApp {
       return;
     }
 
-    const data = this.violations.map((v, idx) => ({
+    const weekFilter = document.getElementById('log-filter-week') ? document.getElementById('log-filter-week').value : 'all';
+    const classFilter = document.getElementById('log-filter-class') ? document.getElementById('log-filter-class').value : 'all';
+    const searchQuery = (document.getElementById('log-filter-search') ? document.getElementById('log-filter-search').value : '').trim().toLowerCase();
+
+    let filtered = this.violations.filter(item => {
+      if (weekFilter !== 'all' && String(item.week) !== String(weekFilter)) return false;
+      if (classFilter !== 'all' && item.class_name !== classFilter) return false;
+      if (searchQuery) {
+        const full = `${item.student_name} ${item.class_name} ${item.violation_category} ${item.original_note}`.toLowerCase();
+        if (!full.includes(searchQuery)) return false;
+      }
+      return true;
+    });
+
+    // Sắp xếp danh sách theo Lớp từ A -> Z và Họ tên học sinh
+    const sorted = this.sortViolations(filtered);
+
+    const data = sorted.map((v, idx) => ({
       'STT': idx + 1,
-      'Tuần': v.week,
-      'Ngày vi phạm': this.formatDate(v.date),
-      'Họ và Tên': v.student_name,
       'Lớp': v.class_name,
+      'Họ và Tên': v.student_name,
+      'Giới tính': v.gender || this.getStudentGender(v.student_name, v.class_name),
+      'Ngày vi phạm': this.formatDate(v.date),
+      'Tuần': v.week,
       'Nội dung vi phạm': v.violation_category,
-      'Điểm trừ': v.penalty_points,
+      'Điểm trừ': v.penalty_points ? -Math.abs(v.penalty_points) : 0,
       'Ghi chú': v.original_note || ''
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 6 },   // STT
+      { wch: 10 },  // Lớp
+      { wch: 26 },  // Họ và Tên
+      { wch: 10 },  // Giới tính
+      { wch: 14 },  // Ngày
+      { wch: 8 },   // Tuần
+      { wch: 32 },  // Nội dung vi phạm
+      { wch: 10 },  // Điểm trừ
+      { wch: 30 }   // Ghi chú
+    ];
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'NhatKyViPham');
-    XLSX.writeFile(wb, `NhatKyViPham_THPT_LeHongPhong_${new Date().toISOString().split('T')[0]}.xlsx`);
-    this.showToast('Đã tải xuống file Excel Nhật ký vi phạm!', 'success');
+    const sheetTitle = weekFilter !== 'all' ? `ViPham_T${weekFilter}` : 'DS_ViPham_Lop_A-Z';
+    XLSX.utils.book_append_sheet(wb, ws, sheetTitle);
+    const fileName = `DS_HocSinh_ViPham_Lop_AZ_${weekFilter !== 'all' ? 'Tuan_' + weekFilter + '_' : ''}${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    this.showToast(`Đã tải xuống file Excel ${fileName} (sắp xếp Lớp A -> Z)!`, 'success');
   }
 
   // ==================== BẢNG XẾP HẠNG & THI ĐUA (TAB 3 - CHUẨN TRANG TÍNH) ====================
@@ -2571,30 +2666,65 @@ class DisciplineApp {
     this.showToast(`Đã cập nhật dữ liệu lớp ${className}!`, 'success');
   }
 
+  viewWeeklyViolations(targetWeek = null) {
+    let w = targetWeek;
+    if (!w) {
+      const emuSelect = document.getElementById('emulation-select-week');
+      w = emuSelect ? parseInt(emuSelect.value, 10) || this.currentWeek : this.currentWeek;
+    }
+    this.viewClassViolations(w, 'all');
+  }
+
   viewClassViolations(weekNum, className) {
     const w = parseInt(weekNum, 10);
-    const viols = this.violations.filter(v => parseInt(v.week, 10) === w && v.class_name === className);
+    const isAll = !className || className === 'all';
+    let viols = this.violations.filter(v => parseInt(v.week, 10) === w && (isAll || v.class_name === className));
+    
+    // Sắp xếp tự động theo thứ tự Lớp A -> Z và Tên học sinh
+    viols = this.sortViolations(viols);
 
-    document.getElementById('modal-class-violations-title').textContent = `Chi Tiết Vi Phạm Lớp ${className} - Tuần ${w}`;
-    document.getElementById('modal-class-violations-subtitle').textContent = `Tìm thấy ${viols.length} vụ vi phạm được ghi nhận trong tuần`;
+    const titleEl = document.getElementById('modal-class-violations-title');
+    const subTitleEl = document.getElementById('modal-class-violations-subtitle');
+
+    if (titleEl) {
+      titleEl.textContent = isAll 
+        ? `Danh Sách Học Sinh Vi Phạm Toàn Trường - Tuần ${String(w).padStart(2, '0')}`
+        : `Chi Tiết Vi Phạm Lớp ${className} - Tuần ${String(w).padStart(2, '0')}`;
+    }
+    if (subTitleEl) {
+      subTitleEl.textContent = isAll
+        ? `Tổng hợp toàn bộ ${viols.length} lượt vi phạm (Sắp xếp Lớp từ A -> Z: 10B01 -> 12C09)`
+        : `Tìm thấy ${viols.length} vụ vi phạm được ghi nhận trong tuần (Sắp xếp khoa học theo Lớp A -> Z)`;
+    }
 
     const totalPts = viols.reduce((s, v) => s + (parseFloat(v.penalty_points) || 0), 0);
-    document.getElementById('modal-class-violations-total').textContent = `-${totalPts.toFixed(1)}đ`;
+    const totalEl = document.getElementById('modal-class-violations-total');
+    if (totalEl) totalEl.textContent = `-${totalPts.toFixed(1)}đ`;
 
     const tbody = document.getElementById('class-violations-tbody');
     if (tbody) {
       if (viols.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Không có vi phạm nào trong tuần được chọn.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400">Không có vi phạm nào trong tuần được chọn.</td></tr>`;
       } else {
-        tbody.innerHTML = viols.map((v, i) => `
-          <tr class="hover:bg-slate-50 border-b border-slate-100">
-            <td class="p-2.5 text-center font-bold text-slate-500">${i + 1}</td>
-            <td class="p-2.5 text-slate-600">${this.formatDate(v.date)}</td>
-            <td class="p-2.5 font-bold text-slate-900">${v.student_name}</td>
-            <td class="p-2.5 text-slate-800 font-semibold">${v.violation_category}</td>
-            <td class="p-2.5 text-center font-bold text-red-600">-${v.penalty_points}đ</td>
-          </tr>
-        `).join('');
+        tbody.innerHTML = viols.map((v, i) => {
+          const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
+          const genderBadge = gender === 'Nữ'
+            ? `<span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nữ</span>`
+            : `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nam</span>`;
+          return `
+            <tr class="hover:bg-slate-50 border-b border-slate-100">
+              <td class="p-2.5 text-center font-bold text-slate-500">${i + 1}</td>
+              <td class="p-2.5 text-center">
+                <span class="font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs">${v.class_name}</span>
+              </td>
+              <td class="p-2.5 font-bold text-slate-900">${v.student_name}</td>
+              <td class="p-2.5 text-center">${genderBadge}</td>
+              <td class="p-2.5 text-center text-slate-600 text-xs">${this.formatDate(v.date)}</td>
+              <td class="p-2.5 text-slate-800 font-semibold">${v.violation_category}</td>
+              <td class="p-2.5 text-center font-bold text-red-600">-${v.penalty_points}đ</td>
+            </tr>
+          `;
+        }).join('');
       }
     }
 
@@ -3063,9 +3193,66 @@ class DisciplineApp {
     const sheetName = `T${emuWeek}`;
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
+    // ==========================================
+    // SHEET 2: DANH SÁCH HỌC SINH VI PHẠM TUẦN (SẮP XẾP LỚP A -> Z)
+    // ==========================================
+    const weeklyViolations = this.sortViolations(
+      this.violations.filter(v => parseInt(v.week, 10) === emuWeek)
+    );
+
+    const wsV = {};
+    const setCellV = (r, c, v, t = 's', z = null, s = null) => {
+      const cellRef = encodeCell(r, c);
+      wsV[cellRef] = { v, t };
+      if (z) wsV[cellRef].z = z;
+      if (s) wsV[cellRef].s = s;
+    };
+
+    setCellV(0, 0, 'SỞ GIÁO DỤC VÀ ĐÀO TẠO ĐẮK LẮK', 's', null, styleSummaryLabel);
+    setCellV(1, 0, 'TRƯỜNG THPT SỐ 1 LÊ HỒNG PHONG', 's', null, styleSummaryLabel);
+    setCellV(3, 0, `DANH SÁCH HỌC SINH VI PHẠM NỀN NẾP TUẦN ${String(emuWeek).padStart(2, '0')}`, 's', null, styleTitle);
+    setCellV(4, 0, `(${dateRange} - Dữ liệu sắp xếp thứ tự Lớp từ A -> Z)`, 's', null, styleSubtitle);
+
+    const vHeaders = ['STT', 'Lớp', 'Họ và Tên Học Sinh', 'Giới tính', 'Ngày vi phạm', 'Lỗi vi phạm (Chuẩn quy chế)', 'Điểm trừ', 'Ghi chú gốc'];
+    vHeaders.forEach((h, cIdx) => {
+      setCellV(6, cIdx, h, 's', null, styleColHeader);
+    });
+
+    let vRowIdx = 7;
+    if (weeklyViolations.length === 0) {
+      setCellV(vRowIdx, 0, 'Trong tuần này không ghi nhận học sinh nào vi phạm nền nếp.', 's', null, styleDataCenter);
+      vRowIdx++;
+    } else {
+      weeklyViolations.forEach((v, idx) => {
+        const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
+        setCellV(vRowIdx, 0, idx + 1, 'n', null, styleDataCenter);
+        setCellV(vRowIdx, 1, v.class_name, 's', null, styleDataCenterBold);
+        setCellV(vRowIdx, 2, v.student_name, 's', null, styleDataLeft);
+        setCellV(vRowIdx, 3, gender, 's', null, styleDataCenter);
+        setCellV(vRowIdx, 4, this.formatDate(v.date), 's', null, styleDataCenter);
+        setCellV(vRowIdx, 5, v.violation_category, 's', null, styleDataLeft);
+        setCellV(vRowIdx, 6, v.penalty_points ? -Math.abs(v.penalty_points) : 0, 'n', '0.0', styleDataCenterBold);
+        setCellV(vRowIdx, 7, v.original_note || '', 's', null, styleDataLeft);
+        vRowIdx++;
+      });
+    }
+
+    wsV['!cols'] = [
+      { wch: 6 },   // STT
+      { wch: 10 },  // Lớp
+      { wch: 26 },  // Họ và Tên
+      { wch: 10 },  // Giới tính
+      { wch: 14 },  // Ngày
+      { wch: 32 },  // Lỗi vi phạm
+      { wch: 10 },  // Điểm trừ
+      { wch: 30 }   // Ghi chú
+    ];
+    wsV['!ref'] = `A1:H${vRowIdx + 2}`;
+    XLSX.utils.book_append_sheet(wb, wsV, `ViPham_T${emuWeek}`);
+
     const fileName = `TONG_HOP_THI_DUA_TUAN_${String(emuWeek).padStart(2, '0')}_THPT_LeHongPhong.xlsx`;
     XLSX.writeFile(wb, fileName);
-    this.showToast(`Đã xuất báo cáo trang tính ${fileName} theo chuẩn mẫu của trường!`, 'success');
+    this.showToast(`Đã xuất báo cáo trang tính ${fileName} (gồm Bảng Thi Đua & DS Vi Phạm Lớp A-Z)!`, 'success');
   }
 
   downloadEmulationTemplateExcel() {

@@ -7678,15 +7678,15 @@ window.DEFAULT_RULES = [
 
 window.DEFAULT_VIOLATIONS = [
   {
-    "id": 1,
+    "id": 5,
     "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Trịnh Nguyễn Thu Trúc",
+    "date": "2026-09-11",
+    "student_name": "Đinh Nguyễn Ngọc Hân",
     "class_name": "10B01",
     "gender": "Nữ",
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Trịnh Nguyễn Thu Trúc - 10B01)"
+    "original_note": "Đi học muộn (Đinh Nguyễn Ngọc Hân - 10B01)"
   },
   {
     "id": 2,
@@ -7700,17 +7700,6 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Đoàn Nguyễn Thị Minh Vy - 10B01)"
   },
   {
-    "id": 3,
-    "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Nguyễn Thị Phương Linh",
-    "class_name": "10B01",
-    "gender": "Nữ",
-    "violation_category": "Đi học muộn",
-    "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Nguyễn Thị Phương Linh - 10B01)"
-  },
-  {
     "id": 4,
     "week": 1,
     "date": "2026-09-07",
@@ -7722,48 +7711,26 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Nguyễn Ngọc Hoàng - 10B01)"
   },
   {
-    "id": 5,
+    "id": 3,
     "week": 1,
-    "date": "2026-09-11",
-    "student_name": "Đinh Nguyễn Ngọc Hân",
+    "date": "2026-09-07",
+    "student_name": "Nguyễn Thị Phương Linh",
     "class_name": "10B01",
     "gender": "Nữ",
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Đinh Nguyễn Ngọc Hân - 10B01)"
+    "original_note": "Đi học muộn (Nguyễn Thị Phương Linh - 10B01)"
   },
   {
-    "id": 6,
+    "id": 1,
     "week": 1,
     "date": "2026-09-07",
-    "student_name": "Phan Ngọc Sáng",
-    "class_name": "10B02",
-    "gender": "Nam",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Phan Ngọc Sáng - 10B02)"
-  },
-  {
-    "id": 7,
-    "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Lưu Dương Gia Huy",
-    "class_name": "10B02",
-    "gender": "Nam",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Lưu Dương Gia Huy - 10B02)"
-  },
-  {
-    "id": 8,
-    "week": 1,
-    "date": "2026-09-11",
-    "student_name": "Trần Khánh Ly",
-    "class_name": "10B02",
+    "student_name": "Trịnh Nguyễn Thu Trúc",
+    "class_name": "10B01",
     "gender": "Nữ",
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Trần Khánh Ly - 10B02)"
+    "original_note": "Đi học muộn (Trịnh Nguyễn Thu Trúc - 10B01)"
   },
   {
     "id": 9,
@@ -7777,6 +7744,39 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Linh Hoài Ân - 10B02)"
   },
   {
+    "id": 7,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Lưu Dương Gia Huy",
+    "class_name": "10B02",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục (Lưu Dương Gia Huy - 10B02)"
+  },
+  {
+    "id": 6,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Phan Ngọc Sáng",
+    "class_name": "10B02",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục (Phan Ngọc Sáng - 10B02)"
+  },
+  {
+    "id": 8,
+    "week": 1,
+    "date": "2026-09-11",
+    "student_name": "Trần Khánh Ly",
+    "class_name": "10B02",
+    "gender": "Nữ",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học muộn (Trần Khánh Ly - 10B02)"
+  },
+  {
     "id": 10,
     "week": 1,
     "date": "2026-09-07",
@@ -7786,17 +7786,6 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Sai đồng phục",
     "penalty_points": 0.5,
     "original_note": "Sai đồng phục (Triệu Văn Hưng - 10B03)"
-  },
-  {
-    "id": 11,
-    "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Thới Văn Thành",
-    "class_name": "10B04",
-    "gender": "Nam",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Thới Văn Thành - 10B04)"
   },
   {
     "id": 12,
@@ -7810,15 +7799,15 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Sai đồng phục (Lê Gia Bảo - 10B04)"
   },
   {
-    "id": 13,
+    "id": 11,
     "week": 1,
     "date": "2026-09-07",
-    "student_name": "Lý Thụy Ngọc Xuyên",
-    "class_name": "10B05",
-    "gender": "Nữ",
-    "violation_category": "Đi học muộn",
+    "student_name": "Thới Văn Thành",
+    "class_name": "10B04",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Lý Thụy Ngọc Xuyên - 10B05)"
+    "original_note": "Sai đồng phục (Thới Văn Thành - 10B04)"
   },
   {
     "id": 14,
@@ -7832,15 +7821,15 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Lương Thị Thu Viễn - 10B05)"
   },
   {
-    "id": 15,
+    "id": 13,
     "week": 1,
     "date": "2026-09-07",
-    "student_name": "Y Sachê Ayũn Niê",
+    "student_name": "Lý Thụy Ngọc Xuyên",
     "class_name": "10B05",
-    "gender": "Nam",
+    "gender": "Nữ",
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Y Sachê Ayũn Niê - 10B05)"
+    "original_note": "Đi học muộn (Lý Thụy Ngọc Xuyên - 10B05)"
   },
   {
     "id": 16,
@@ -7854,15 +7843,15 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Phạm Bình An - 10B05)"
   },
   {
-    "id": 17,
+    "id": 15,
     "week": 1,
     "date": "2026-09-07",
-    "student_name": "Nguyễn Thanh Phong",
-    "class_name": "10B06",
+    "student_name": "Y Sachê Ayũn Niê",
+    "class_name": "10B05",
     "gender": "Nam",
-    "violation_category": "Sai đồng phục",
+    "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Nguyễn Thanh Phong - 10B06)"
+    "original_note": "Đi học muộn (Y Sachê Ayũn Niê - 10B05)"
   },
   {
     "id": 18,
@@ -7887,15 +7876,15 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Nguyễn Huỳnh Thùy Dung - 10B06)"
   },
   {
-    "id": 20,
+    "id": 17,
     "week": 1,
     "date": "2026-09-07",
-    "student_name": "Nguyễn Đình Huy",
-    "class_name": "10B09",
+    "student_name": "Nguyễn Thanh Phong",
+    "class_name": "10B06",
     "gender": "Nam",
     "violation_category": "Sai đồng phục",
     "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Nguyễn Đình Huy - 10B09)"
+    "original_note": "Sai đồng phục (Nguyễn Thanh Phong - 10B06)"
   },
   {
     "id": 21,
@@ -7907,6 +7896,17 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
     "original_note": "Đi học muộn (Nguyễn Đàm Mạnh Tiến - 10B09)"
+  },
+  {
+    "id": 20,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Nguyễn Đình Huy",
+    "class_name": "10B09",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục (Nguyễn Đình Huy - 10B09)"
   },
   {
     "id": 22,
@@ -7942,15 +7942,15 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Sai đồng phục (Nguyễn Phú Hoàng - 10B11)"
   },
   {
-    "id": 25,
+    "id": 27,
     "week": 1,
     "date": "2026-09-07",
-    "student_name": "Y San Ly Niê",
+    "student_name": "Y Duân Ayũn",
     "class_name": "10B11",
     "gender": "Nam",
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Y San Ly Niê - 10B11)"
+    "original_note": "Đi học muộn (Y Duân Ayũn - 10B11)"
   },
   {
     "id": 26,
@@ -7964,15 +7964,15 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Y Khang Kbuôr - 10B11)"
   },
   {
-    "id": 27,
+    "id": 25,
     "week": 1,
     "date": "2026-09-07",
-    "student_name": "Y Duân Ayũn",
+    "student_name": "Y San Ly Niê",
     "class_name": "10B11",
     "gender": "Nam",
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Y Duân Ayũn - 10B11)"
+    "original_note": "Đi học muộn (Y San Ly Niê - 10B11)"
   },
   {
     "id": 28,
@@ -8008,17 +8008,6 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Nguyễn Hồng Đại Phúc - 11A02)"
   },
   {
-    "id": 31,
-    "week": 1,
-    "date": "2026-09-11",
-    "student_name": "Trần Cao Huy",
-    "class_name": "11A03",
-    "gender": "Nam",
-    "violation_category": "Đi học muộn",
-    "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Trần Cao Huy - 11A03)"
-  },
-  {
     "id": 32,
     "week": 1,
     "date": "2026-09-08",
@@ -8030,15 +8019,15 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Trần Cao Huy - 11A03)"
   },
   {
-    "id": 33,
+    "id": 31,
     "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Phan Quang Kim Ngân",
-    "class_name": "11A04",
-    "gender": "Nữ",
+    "date": "2026-09-11",
+    "student_name": "Trần Cao Huy",
+    "class_name": "11A03",
+    "gender": "Nam",
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Phan Quang Kim Ngân - 11A04)"
+    "original_note": "Đi học muộn (Trần Cao Huy - 11A03)"
   },
   {
     "id": 34,
@@ -8052,6 +8041,17 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Phan Đăng Thanh Khôi - 11A04)"
   },
   {
+    "id": 33,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Phan Quang Kim Ngân",
+    "class_name": "11A04",
+    "gender": "Nữ",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học muộn (Phan Quang Kim Ngân - 11A04)"
+  },
+  {
     "id": 35,
     "week": 1,
     "date": "2026-09-11",
@@ -8061,28 +8061,6 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
     "original_note": "Đi học muộn (H Sina Niê - 11A06)"
-  },
-  {
-    "id": 36,
-    "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Y Tin Mlô",
-    "class_name": "11A09",
-    "gender": "Nam",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Y Tin Mlô - 11A09)"
-  },
-  {
-    "id": 37,
-    "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Phan Hữu Trọng",
-    "class_name": "11A09",
-    "gender": "Nam",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Phan Hữu Trọng - 11A09)"
   },
   {
     "id": 38,
@@ -8096,6 +8074,28 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Sai đồng phục (Nông Thị Ánh Nguyệt - 11A09)"
   },
   {
+    "id": 37,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Phan Hữu Trọng",
+    "class_name": "11A09",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục (Phan Hữu Trọng - 11A09)"
+  },
+  {
+    "id": 36,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Y Tin Mlô",
+    "class_name": "11A09",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục (Y Tin Mlô - 11A09)"
+  },
+  {
     "id": 39,
     "week": 1,
     "date": "2026-09-07",
@@ -8105,17 +8105,6 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Sai đồng phục",
     "penalty_points": 0.5,
     "original_note": "Sai đồng phục (Đỗ Minh An - 12C01)"
-  },
-  {
-    "id": 40,
-    "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Nguyễn Quốc Bình",
-    "class_name": "12C02",
-    "gender": "Nam",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Nguyễn Quốc Bình - 12C02)"
   },
   {
     "id": 41,
@@ -8140,15 +8129,15 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Nguyễn Hửu Quyền - 12C02)"
   },
   {
-    "id": 43,
+    "id": 40,
     "week": 1,
     "date": "2026-09-07",
-    "student_name": "Nguyễn Lê Ngọc Cầm",
-    "class_name": "12C03",
-    "gender": "Nữ",
-    "violation_category": "Đi học muộn",
+    "student_name": "Nguyễn Quốc Bình",
+    "class_name": "12C02",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
     "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Nguyễn Lê Ngọc Cầm - 12C03)"
+    "original_note": "Sai đồng phục (Nguyễn Quốc Bình - 12C02)"
   },
   {
     "id": 44,
@@ -8160,6 +8149,17 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
     "original_note": "Đi học muộn (Nguyễn Hoàng Việt Anh - 12C03)"
+  },
+  {
+    "id": 43,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Nguyễn Lê Ngọc Cầm",
+    "class_name": "12C03",
+    "gender": "Nữ",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học muộn (Nguyễn Lê Ngọc Cầm - 12C03)"
   },
   {
     "id": 45,
@@ -8195,17 +8195,6 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Sai đồng phục (Nguyễn Ngọc Trường Kỳ - 12C05)"
   },
   {
-    "id": 48,
-    "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Gia Như",
-    "class_name": "12C06",
-    "gender": "Nữ",
-    "violation_category": "Đi học muộn",
-    "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Gia Như - 12C06)"
-  },
-  {
     "id": 49,
     "week": 1,
     "date": "2026-09-07",
@@ -8215,6 +8204,17 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
     "original_note": "Đi học muộn (Đào Ngọc Tường Vy - 12C06)"
+  },
+  {
+    "id": 48,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Gia Như",
+    "class_name": "12C06",
+    "gender": "Nữ",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học muộn (Gia Như - 12C06)"
   },
   {
     "id": 50,
@@ -8228,17 +8228,6 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Nguyễn Ngọc Bảo Trân - 12C06)"
   },
   {
-    "id": 51,
-    "week": 1,
-    "date": "2026-09-07",
-    "student_name": "Lê Trần Bảo Toàn",
-    "class_name": "12C08",
-    "gender": "Nam",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Lê Trần Bảo Toàn - 12C08)"
-  },
-  {
     "id": 52,
     "week": 1,
     "date": "2026-09-11",
@@ -8248,6 +8237,17 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
     "original_note": "Đi học muộn (H Quyên Ayǔn - 12C08)"
+  },
+  {
+    "id": 51,
+    "week": 1,
+    "date": "2026-09-07",
+    "student_name": "Lê Trần Bảo Toàn",
+    "class_name": "12C08",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục (Lê Trần Bảo Toàn - 12C08)"
   },
   {
     "id": 53,
@@ -8349,17 +8349,6 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Võ Ngọc Tín - 10B10)"
   },
   {
-    "id": 62,
-    "week": 2,
-    "date": "",
-    "student_name": "Nguyễn Phi Nhật",
-    "class_name": "12C07",
-    "gender": "Nam",
-    "violation_category": "Đi học muộn",
-    "penalty_points": 0.5,
-    "original_note": "Đi học muộn (Nguyễn Phi Nhật - 12C07)"
-  },
-  {
     "id": 63,
     "week": 2,
     "date": "",
@@ -8369,6 +8358,17 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Đi học muộn",
     "penalty_points": 0.5,
     "original_note": "Đi học muộn (Lưu Gia Nghĩa - 12C07)"
+  },
+  {
+    "id": 62,
+    "week": 2,
+    "date": "",
+    "student_name": "Nguyễn Phi Nhật",
+    "class_name": "12C07",
+    "gender": "Nam",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học muộn (Nguyễn Phi Nhật - 12C07)"
   },
   {
     "id": 64,
@@ -8558,17 +8558,6 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn (Trần Ngọc Vũ - 11A07)"
   },
   {
-    "id": 81,
-    "week": 5,
-    "date": "",
-    "student_name": "Huỳnh Lê Bảo An",
-    "class_name": "12C03",
-    "gender": "Nam",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục (Huỳnh Lê Bảo An - 12C03)"
-  },
-  {
     "id": 82,
     "week": 5,
     "date": "",
@@ -8580,6 +8569,17 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Sai đồng phục (Dương Minh Hiếu - 12C03)"
   },
   {
+    "id": 81,
+    "week": 5,
+    "date": "",
+    "student_name": "Huỳnh Lê Bảo An",
+    "class_name": "12C03",
+    "gender": "Nam",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục (Huỳnh Lê Bảo An - 12C03)"
+  },
+  {
     "id": 83,
     "week": 5,
     "date": "",
@@ -8589,46 +8589,6 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Sai đồng phục",
     "penalty_points": 0.5,
     "original_note": "Sai đồng phục (H Ti Ra Niê - 12C08)"
-  },
-  {
-    "id": 84,
-    "week": 7,
-    "date": "2026-10-20",
-    "student_name": "Nguyễn Bo",
-    "class_name": "11A04",
-    "violation_category": "Không bảng tên",
-    "penalty_points": 0.5,
-    "original_note": "Không bảng tên giờ chào cờ"
-  },
-  {
-    "id": 85,
-    "week": 7,
-    "date": "2026-10-20",
-    "student_name": "H Ti Ra Niê",
-    "class_name": "12C08",
-    "violation_category": "Sai đồng phục",
-    "penalty_points": 0.5,
-    "original_note": "Sai đồng phục ngày thứ ba"
-  },
-  {
-    "id": 86,
-    "week": 7,
-    "date": "2026-10-19",
-    "student_name": "Trần Ngọc Vũ",
-    "class_name": "11A07",
-    "violation_category": "Đi học muộn",
-    "penalty_points": 0.5,
-    "original_note": "Đi học trễ 10 phút"
-  },
-  {
-    "id": 87,
-    "week": 7,
-    "date": "2026-10-19",
-    "student_name": "Lê Âu Kỳ",
-    "class_name": "10B11",
-    "violation_category": "Đi học muộn",
-    "penalty_points": 0.5,
-    "original_note": "Đi học muộn xe hư"
   },
   {
     "id": 88,
@@ -8708,10 +8668,10 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Đi học muộn"
   },
   {
-    "id": 95,
+    "id": 96,
     "week": 6,
     "date": "2026-10-13",
-    "student_name": "Huỳnh Lê Bảo An",
+    "student_name": "Dương Minh Hiếu",
     "class_name": "12C03",
     "gender": "Nam",
     "violation_category": "Sai đồng phục",
@@ -8719,10 +8679,10 @@ window.DEFAULT_VIOLATIONS = [
     "original_note": "Sai đồng phục"
   },
   {
-    "id": 96,
+    "id": 95,
     "week": 6,
     "date": "2026-10-13",
-    "student_name": "Dương Minh Hiếu",
+    "student_name": "Huỳnh Lê Bảo An",
     "class_name": "12C03",
     "gender": "Nam",
     "violation_category": "Sai đồng phục",
@@ -8739,6 +8699,50 @@ window.DEFAULT_VIOLATIONS = [
     "violation_category": "Sai đồng phục",
     "penalty_points": 0.5,
     "original_note": "Sai đồng phục"
+  },
+  {
+    "id": 87,
+    "week": 7,
+    "date": "2026-10-19",
+    "student_name": "Lê Âu Kỳ",
+    "class_name": "10B11",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học muộn xe hư",
+    "gender": "Nam"
+  },
+  {
+    "id": 84,
+    "week": 7,
+    "date": "2026-10-20",
+    "student_name": "Nguyễn Bo",
+    "class_name": "11A04",
+    "violation_category": "Không bảng tên",
+    "penalty_points": 0.5,
+    "original_note": "Không bảng tên giờ chào cờ",
+    "gender": "Nam"
+  },
+  {
+    "id": 86,
+    "week": 7,
+    "date": "2026-10-19",
+    "student_name": "Trần Ngọc Vũ",
+    "class_name": "11A07",
+    "violation_category": "Đi học muộn",
+    "penalty_points": 0.5,
+    "original_note": "Đi học trễ 10 phút",
+    "gender": "Nam"
+  },
+  {
+    "id": 85,
+    "week": 7,
+    "date": "2026-10-20",
+    "student_name": "H Ti Ra Niê",
+    "class_name": "12C08",
+    "violation_category": "Sai đồng phục",
+    "penalty_points": 0.5,
+    "original_note": "Sai đồng phục ngày thứ ba",
+    "gender": "Nữ"
   }
 ];
 
