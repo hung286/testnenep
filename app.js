@@ -656,18 +656,15 @@ class DisciplineApp {
   }
 
   switchTab(targetTab) {
-    // Tab Quản lý học sinh (tab-students) cho phép Khách xem và Giám thị thêm
-    // Chỉ các tab cấu hình hệ thống nhạy cảm mới bắt buộc quyền Quản trị Admin (2806)
-    const SENSITIVE_ADMIN_TABS = ['tab-rules', 'tab-backup'];
+    // Tab Quản lý học sinh và Tab Danh mục lỗi cho phép Giám thị / Cờ đỏ và Admin truy cập
+    // Chỉ tab Sao lưu & Bảo vệ dữ liệu mới bắt buộc quyền Quản trị Admin (2806)
+    const SENSITIVE_ADMIN_TABS = ['tab-backup'];
     if (SENSITIVE_ADMIN_TABS.includes(targetTab) && !this.isAdmin()) {
-      let tabName = 'mục quản trị này';
-      if (targetTab === 'tab-rules') tabName = 'Danh Mục Lỗi & Điểm';
-      else if (targetTab === 'tab-backup') tabName = 'Sao Lưu & Bảo Vệ Dữ Liệu';
-
+      let tabName = 'Sao Lưu & Bảo Vệ Dữ Liệu';
       const isSuper = this.isSupervisor();
       const msg = isSuper
-        ? `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin cấp cao (Mật khẩu: 2806). Bạn đang ở quyền Giám thị / Cờ đỏ!`
-        : `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin (Mật khẩu: 2806). Vui lòng đăng nhập Admin để truy cập!`;
+        ? `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin cấp cao. Bạn đang ở quyền Giám thị / Cờ đỏ!`
+        : `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin. Vui lòng đăng nhập Admin để truy cập!`;
 
       this.showToast(msg, 'warning');
       this.openPasswordModal(() => {
@@ -1175,6 +1172,10 @@ class DisciplineApp {
     const btnResetDefaultStudents = document.getElementById('btn-reset-default-students');
     if (btnResetDefaultStudents) {
       btnResetDefaultStudents.addEventListener('click', () => {
+        if (!this.isSupervisor()) {
+          this.openPasswordModal();
+          return;
+        }
         if (confirm('Khôi phục danh sách gốc 1.226 học sinh Trường THPT Số 1 Lê Hồng Phong?')) {
           this.students = JSON.parse(JSON.stringify(window.DEFAULT_STUDENTS || []));
           this.saveStudents();
@@ -1224,6 +1225,10 @@ class DisciplineApp {
     const btnResetDefaultRules = document.getElementById('btn-reset-default-rules');
     if (btnResetDefaultRules) {
       btnResetDefaultRules.addEventListener('click', () => {
+        if (!this.isSupervisor()) {
+          this.openPasswordModal();
+          return;
+        }
         if (confirm('Khôi phục danh mục 33 lỗi vi phạm quy định gốc của trường?')) {
           this.rules = JSON.parse(JSON.stringify(window.DEFAULT_RULES || []));
           this.saveRules();
@@ -1935,16 +1940,9 @@ class DisciplineApp {
 
       if (!isAuth) {
         deleteBtn = `
-          <span class="text-slate-300 p-1 flex items-center justify-center" title="Chế độ Chỉ xem (Không thể xóa)">
+          <span class="text-slate-300 p-1 flex items-center justify-center" title="Chế độ Chỉ xem (Đăng nhập để sửa/xóa)">
             <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-300"></i>
           </span>
-        `;
-      } else if (isLocked) {
-        weekBadge = `<span class="bg-amber-100 text-amber-800 border border-amber-300 text-xs px-2 py-0.5 rounded-full font-bold inline-flex items-center gap-1" title="Tuần đã khóa niêm phong"><i data-lucide="lock" class="w-3 h-3 text-amber-600"></i> T${v.week}</span>`;
-        deleteBtn = `
-          <button disabled class="text-slate-300 p-1 cursor-not-allowed" title="Tuần ${v.week} đã khóa niêm phong (Read-Only)">
-            <i data-lucide="lock" class="w-4 h-4 text-slate-300"></i>
-          </button>
         `;
       } else {
         deleteBtn = `
@@ -1998,17 +1996,10 @@ class DisciplineApp {
     const targetClass = target.class_name;
     const studentName = target.student_name || 'Học sinh';
 
-    if (this.isWeekLocked(targetWeek)) {
-      if (this.isAdmin()) {
-        if (confirm(`Vi phạm này thuộc Tuần ${targetWeek} đang được khóa niêm phong. Bạn đang có quyền Admin, bạn có muốn mở khóa Tuần ${targetWeek} để xóa bản ghi này không?`)) {
-          this.adminUnlockSpecificWeek(targetWeek);
-        } else {
-          return;
-        }
-      } else {
-        this.showToast(`Vi phạm này thuộc Tuần ${targetWeek} đã được khóa niêm phong an toàn. Chỉ Quản trị viên (Admin) mới có quyền mở khóa để xóa!`, 'error');
-        return;
-      }
+    if (!this.isSupervisor()) {
+      this.showToast('Chế độ Chỉ xem! Vui lòng đăng nhập Giám thị / Cờ đỏ hoặc Admin để xóa vi phạm.', 'warning');
+      this.openPasswordModal(() => this.deleteViolation(id));
+      return;
     }
 
     this.requirePassword(() => {
@@ -2050,9 +2041,9 @@ class DisciplineApp {
       return;
     }
 
-    const w = parseInt(v.week, 10);
-    if (this.isWeekLocked(w) && !this.isAdmin()) {
-      this.showToast(`Vi phạm này thuộc Tuần ${w} đã khóa niêm phong. Cần đăng nhập Admin để sửa!`, 'error');
+    if (!this.isSupervisor()) {
+      this.showToast('Chế độ Chỉ xem! Vui lòng đăng nhập Giám thị / Cờ đỏ hoặc Admin để sửa vi phạm.', 'warning');
+      this.openPasswordModal(() => this.openEditViolationModal(id));
       return;
     }
 
@@ -2537,7 +2528,7 @@ class DisciplineApp {
                 <i data-lucide="shield-check" class="w-4 h-4"></i>
               </div>
               <div>
-                <p class="font-extrabold text-emerald-950">CẤP ĐỘ 3 - QUẢN TRỊ ADMIN CẤP CAO ĐANG KÍCH HOẠT (Mật khẩu: 2806)</p>
+                <p class="font-extrabold text-emerald-950">CẤP ĐỘ 3 - QUẢN TRỊ ADMIN CẤP CAO ĐANG KÍCH HOẠT</p>
                 <p class="text-[11px] text-emerald-800">Toàn quyền hệ thống: Mở/khóa các tuần từ 1 đến 6, Quản lý danh mục lỗi, Quản lý học sinh, Sao lưu dữ liệu và toàn bộ quyền của Giám thị.</p>
               </div>
             </div>
@@ -2561,7 +2552,7 @@ class DisciplineApp {
               </div>
               <div>
                 <p class="font-extrabold text-indigo-950">CẤP ĐỘ 2 - GIÁM THỊ / ĐỘI CỜ ĐỎ ĐANG HOẠT ĐỘNG</p>
-                <p class="text-[11px] text-indigo-800">Thầy/cô có quyền: Thêm danh sách học sinh, Thêm/Sửa/Xóa vi phạm trong tuần đang mở. Mọi thay đổi tự động đồng bộ thời gian thực qua bảng thi đua.</p>
+                <p class="text-[11px] text-indigo-800">Thầy/cô có quyền: Thêm danh sách học sinh, thêm/bớt/sửa các lỗi vi phạm trong phần Nhật ký vi phạm và điều chỉnh Danh mục lỗi & điểm. Mọi thay đổi tự động đồng bộ thời gian thực qua bảng thi đua.</p>
               </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
@@ -3055,8 +3046,7 @@ class DisciplineApp {
         tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-slate-400">Không có vi phạm nào trong tuần được chọn.</td></tr>`;
       } else {
         const isAuth = this.isDataEntryUnlocked();
-        const isLocked = this.isWeekLocked(w);
-        const canAction = isAuth && (!isLocked || this.isAdmin());
+        const canAction = isAuth;
 
         tbody.innerHTML = viols.map((v, i) => {
           const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
@@ -4170,7 +4160,7 @@ class DisciplineApp {
   // ==================== QUẢN LÝ HỌC SINH (TAB 4 - NGUỒN MỞ) ====================
 
   renderStudentsTable() {
-    const isAuth = this.isAdmin();
+    const isAuth = this.isSupervisor();
     const tbody = document.getElementById('students-table-body');
     const countSpan = document.getElementById('student-table-count');
     const searchVal = (document.getElementById('student-search-query').value || '').trim().toLowerCase();
@@ -4232,6 +4222,10 @@ class DisciplineApp {
   }
 
   openStudentModal(student = null) {
+    if (!this.isSupervisor()) {
+      this.openPasswordModal(() => this.openStudentModal(student));
+      return;
+    }
     this.editingStudentId = student ? student.id : null;
     const modal = document.getElementById('modal-student');
     const title = document.getElementById('modal-student-title');
@@ -4296,6 +4290,10 @@ class DisciplineApp {
   }
 
   deleteStudent(id) {
+    if (!this.isSupervisor()) {
+      this.openPasswordModal(() => this.deleteStudent(id));
+      return;
+    }
     if (confirm('Bạn có chắc muốn xóa học sinh này khỏi danh sách trường?')) {
       this.students = this.students.filter(s => s.id !== id);
       this.saveStudents();
@@ -4399,7 +4397,7 @@ class DisciplineApp {
   // ==================== QUẢN LÝ QUY ĐỊNH LỖI (TAB 5 - NGUỒN MỞ) ====================
 
   renderRulesTable() {
-    const isAuth = this.isAdmin();
+    const isAuth = this.isSupervisor();
     const tbody = document.getElementById('rules-table-body');
     if (!tbody) return;
 
@@ -4442,6 +4440,10 @@ class DisciplineApp {
   }
 
   openRuleModal(rule = null) {
+    if (!this.isSupervisor()) {
+      this.openPasswordModal(() => this.openRuleModal(rule));
+      return;
+    }
     this.editingRuleId = rule ? rule.id : null;
     const modal = document.getElementById('modal-rule');
     const title = document.getElementById('modal-rule-title');
@@ -4500,6 +4502,10 @@ class DisciplineApp {
   }
 
   deleteRule(id) {
+    if (!this.isSupervisor()) {
+      this.openPasswordModal(() => this.deleteRule(id));
+      return;
+    }
     if (confirm('Bạn có chắc muốn xóa lỗi này khỏi danh mục quy chế?')) {
       this.rules = this.rules.filter(r => r.id !== id);
       this.saveRules();
@@ -4629,14 +4635,20 @@ class DisciplineApp {
 
     if (inputPass) {
       // Tắt triệt để tính năng gợi ý và lưu mật khẩu của trình duyệt
-      inputPass.setAttribute('autocomplete', 'off');
-      inputPass.setAttribute('name', 'lhp_otp_token');
+      inputPass.setAttribute('type', 'password');
+      inputPass.setAttribute('autocomplete', 'new-password');
+      inputPass.setAttribute('name', 'random_pass_field');
       inputPass.setAttribute('autocorrect', 'off');
       inputPass.setAttribute('autocapitalize', 'off');
       inputPass.setAttribute('spellcheck', 'false');
       inputPass.setAttribute('data-lpignore', 'true');
       inputPass.setAttribute('data-1p-ignore', 'true');
       inputPass.setAttribute('data-form-type', 'other');
+      inputPass.setAttribute('readonly', 'readonly');
+
+      inputPass.addEventListener('focus', () => inputPass.removeAttribute('readonly'));
+      inputPass.addEventListener('mousedown', () => inputPass.removeAttribute('readonly'));
+      inputPass.addEventListener('touchstart', () => inputPass.removeAttribute('readonly'));
 
       // Tự động xóa viền đỏ khi người dùng bắt đầu gõ lại
       inputPass.addEventListener('input', () => {
@@ -4767,13 +4779,13 @@ class DisciplineApp {
       }
     }
 
-    // 1. Cập nhật các badge khóa trên thanh điều hướng tab: CHỈ ẨN KHI LÀ ADMIN
-    ['tab-students', 'tab-rules', 'tab-backup'].forEach(tabId => {
-      const lockBadge = document.getElementById(`lock-badge-${tabId}`);
-      if (lockBadge) {
-        lockBadge.style.display = isAdmin ? 'none' : 'inline-flex';
-      }
-    });
+    // 1. Cập nhật các badge khóa trên thanh điều hướng tab
+    const lockBackup = document.getElementById('lock-badge-tab-backup');
+    if (lockBackup) lockBackup.style.display = isAdmin ? 'none' : 'inline-flex';
+    const lockRules = document.getElementById('lock-badge-tab-rules');
+    if (lockRules) lockRules.style.display = 'none';
+    const lockStudents = document.getElementById('lock-badge-tab-students');
+    if (lockStudents) lockStudents.style.display = 'none';
 
     // 2. Tab 1: Nút Thêm lỗi & Chạy AI: Mở cho CẢ Admin VÀ Giám thị / Cờ đỏ
     const btnManualAdd = document.getElementById('btn-manual-add');
@@ -4826,14 +4838,14 @@ class DisciplineApp {
 
     if (btnAddStudent) btnAddStudent.style.display = isSupervisor ? 'inline-flex' : 'none';
     if (btnImportStudent) btnImportStudent.style.display = isSupervisor ? 'inline-flex' : 'none';
-    // Nút khôi phục 1.226 học sinh gốc CHỈ dành cho Admin cấp cao
-    if (btnResetStudent) btnResetStudent.style.display = isAdmin ? 'inline-flex' : 'none';
+    // Nút khôi phục 1.226 học sinh gốc: Mở cho CẢ Giám thị và Admin
+    if (btnResetStudent) btnResetStudent.style.display = isSupervisor ? 'inline-flex' : 'none';
 
-    // 5. Tab 5: Ẩn / Hiện nút Thêm / Reset nội quy: CHỈ DÀNH CHO ADMIN
-    ['btn-open-add-rule', 'btn-reset-default-rules'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = isAdmin ? 'inline-flex' : 'none';
-    });
+    // 5. Tab 5: Nút Thêm / Reset nội quy: Mở cho CẢ Giám thị và Admin
+    const btnAddRule = document.getElementById('btn-open-add-rule');
+    const btnResetRule = document.getElementById('btn-reset-default-rules');
+    if (btnAddRule) btnAddRule.style.display = isSupervisor ? 'inline-flex' : 'none';
+    if (btnResetRule) btnResetRule.style.display = isSupervisor ? 'inline-flex' : 'none';
 
     // 6. Tab 6: Ẩn / Hiện nút Tạo điểm khôi phục / Reset: CHỈ DÀNH CHO ADMIN
     ['btn-open-create-snapshot', 'btn-trigger-snapshot-modal', 'btn-clear-all-snapshots'].forEach(id => {
@@ -4863,10 +4875,10 @@ class DisciplineApp {
     if (title && subtitle) {
       if (this.currentModalRequireAdmin) {
         title.textContent = 'Xác Thực Quản Trị Admin Cấp Cao';
-        subtitle.textContent = 'Mục này yêu cầu quyền Quản trị Admin (Mật khẩu: 2806) để cấu hình, mở/khóa tuần hoặc sao lưu hệ thống.';
+        subtitle.textContent = 'Mục này yêu cầu quyền Quản trị Admin để cấu hình, mở/khóa tuần hoặc sao lưu hệ thống.';
       } else {
         title.textContent = 'Đăng Nhập Ban Nền Nếp & Quản Trị';
-        subtitle.textContent = 'Nhập mật khẩu Quản trị Admin (2806) hoặc Giám thị / Đội cờ đỏ (lhp38).';
+        subtitle.textContent = 'Nhập mật khẩu Quản trị Admin hoặc Giám thị / Đội cờ đỏ để mở khóa.';
       }
     }
 
@@ -4877,10 +4889,16 @@ class DisciplineApp {
     }
     if (input) {
       input.value = '';
-      input.setAttribute('autocomplete', 'off');
-      input.setAttribute('name', 'auth_code_no_suggest_' + Math.random().toString(36).slice(2));
+      input.setAttribute('type', 'password');
+      input.setAttribute('autocomplete', 'new-password');
+      input.setAttribute('name', 'random_pass_field');
+      input.setAttribute('autocorrect', 'off');
+      input.setAttribute('autocapitalize', 'off');
+      input.setAttribute('spellcheck', 'false');
       input.setAttribute('data-lpignore', 'true');
       input.setAttribute('data-1p-ignore', 'true');
+      input.setAttribute('data-form-type', 'other');
+      input.setAttribute('readonly', 'readonly');
       input.classList.remove('border-red-500', 'bg-red-50');
       input.classList.add('border-slate-300');
     }
@@ -4889,6 +4907,7 @@ class DisciplineApp {
       modal.style.display = 'flex';
       setTimeout(() => {
         if (input) {
+          input.removeAttribute('readonly');
           input.focus();
           input.select();
         }
@@ -4912,7 +4931,10 @@ class DisciplineApp {
     }
     if (input) {
       input.value = '';
-      input.setAttribute('autocomplete', 'off');
+      input.setAttribute('type', 'password');
+      input.setAttribute('autocomplete', 'new-password');
+      input.setAttribute('name', 'random_pass_field');
+      input.setAttribute('readonly', 'readonly');
       input.classList.remove('border-red-500', 'bg-red-50');
       input.classList.add('border-slate-300');
     }
@@ -4967,9 +4989,9 @@ class DisciplineApp {
         this.updateLockStatusUI();
 
         if (isAdminPass) {
-          this.showToast('🔓 Quyền Admin: Đăng nhập thành công! Đã cấp quyền quản trị cấp cao và mở khóa toàn bộ các tuần.', 'success');
+          this.showToast('🔓 Quyền Admin: Đăng nhập thành công! Đã cấp toàn quyền quản trị cấp cao và mở khóa toàn bộ các tuần.', 'success');
         } else {
-          this.showToast('🚩 Quyền Giám Thị / Cờ Đỏ: Đăng nhập thành công! Thầy/cô và ban nền nếp có thể ghi nhận vi phạm.', 'success');
+          this.showToast('🚩 Quyền Giám Thị / Đội Cờ Đỏ: Đăng nhập thành công! Thầy/cô có quyền thêm danh sách HS, thêm/bớt/sửa vi phạm và điều chỉnh danh mục lỗi & điểm.', 'success');
         }
 
         if (typeof this.pendingAction === 'function') {
