@@ -592,6 +592,12 @@ class DisciplineApp {
       localStorage.setItem('gemini_api_key', DEFAULT_API_KEY);
     }
 
+    // 2. Migration: Nếu URL cũ là kvdb.io (không còn dùng), tự động chuyển sang GAS mới
+    const savedUrl = localStorage.getItem('dshs_cloud_url');
+    if (!savedUrl || savedUrl.includes('kvdb.io')) {
+      localStorage.removeItem('dshs_cloud_url'); // Xóa URL cũ, dùng DEFAULT_CLOUD_URL (GAS)
+    }
+
     this.setupDateAndTime();
     this.syncCloudData(true);
     this.setupTabs();
@@ -877,26 +883,42 @@ class DisciplineApp {
     const btnCloudSync = document.getElementById('btn-cloud-sync');
     if (btnCloudSync) btnCloudSync.addEventListener('click', () => this.syncCloudData(false));
 
-    // Đồng bộ thời gian thực đa thiết bị: Tự động kéo dữ liệu khi chuyển tab hoặc mở lại trình duyệt
+    // ── Auto-Refresh & Polling: Đồng bộ thời gian thực đa thiết bị ──────────────
+    // 1. visibilitychange: Kéo dữ liệu khi người dùng quay lại tab (tránh dữ liệu trống)
+    //    Dùng biến _lastVisibilitySyncTime để tránh gọi trùng ngay sau window.focus
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') {
+        const now = Date.now();
+        // Chỉ kéo nếu lần cuối sync cách đây hơn 3 giây (tránh duplicate với focus event)
+        if (!this._lastVisibilitySyncTime || (now - this._lastVisibilitySyncTime > 3000)) {
+          this._lastVisibilitySyncTime = now;
+          this.pullAndMergeFromCloud(true);
+        }
+      }
+    });
+
+    // 2. window.focus: Kéo dữ liệu khi cửa sổ/tab được chọn lại (đa tab, đa thiết bị)
+    window.addEventListener('focus', () => {
+      const now = Date.now();
+      if (!this._lastVisibilitySyncTime || (now - this._lastVisibilitySyncTime > 3000)) {
+        this._lastVisibilitySyncTime = now;
         this.pullAndMergeFromCloud(true);
       }
     });
 
-    window.addEventListener('focus', () => {
-      this.pullAndMergeFromCloud(true);
-    });
-
+    // 3. online: Kết nối mạng khôi phục → đồng bộ đầy đủ ngay lập tức
     window.addEventListener('online', () => {
+      this._lastPullTime = 0; // Reset rate-limit để kéo ngay
       this.syncCloudData(true);
     });
 
-    // Vòng lặp định kỳ mỗi 15 giây tự động đồng bộ ngầm
+    // 4. Polling định kỳ mỗi 10 giây (chỉ khi tab đang hiển thị, tiết kiệm băng thông)
     if (this.autoSyncInterval) clearInterval(this.autoSyncInterval);
     this.autoSyncInterval = setInterval(() => {
+      // Bỏ qua nếu tab bị ẩn (document.hidden) để không lãng phí tài nguyên
+      if (document.hidden) return;
       this.pullAndMergeFromCloud(true);
-    }, 15000);
+    }, 10000);
 
     const btnCopyMdLogs = document.getElementById('btn-copy-markdown-logs');
     if (btnCopyMdLogs) btnCopyMdLogs.addEventListener('click', () => this.copyLogsMarkdown());
@@ -5091,7 +5113,8 @@ class DisciplineApp {
   // ==================== CƠ SỞ DỮ LIỆU ĐÁM MÂY (GOOGLE SHEETS CLOUD DATABASE) ====================
 
   get DEFAULT_CLOUD_URL() {
-    return 'https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/violations';
+    // Google Apps Script Web App (Google Sheets Cloud Database chính thức)
+    return 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec';
   }
 
   getCloudUrl() {
@@ -5189,7 +5212,12 @@ class DisciplineApp {
 
     try {
       let method = 'POST';
-      let headers = { 'Content-Type': 'application/json' };
+      // Cache-Busting: Thêm header ngăn trình duyệt cache phản hồi POST
+      let headers = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      };
       const isGAS = cloudUrl.includes('script.google.com');
 
       // Hỗ trợ Firebase Realtime Database REST API (sử dụng method PUT)
@@ -5199,7 +5227,11 @@ class DisciplineApp {
 
       // Với Google Apps Script Web App, BẮT BUỘC dùng Content-Type: text/plain;charset=utf-8 để tránh CORS preflight OPTIONS
       if (isGAS) {
-        headers = { 'Content-Type': 'text/plain;charset=utf-8' };
+        headers = {
+          'Content-Type': 'text/plain;charset=utf-8',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        };
       }
 
       const payload = {
@@ -5212,9 +5244,15 @@ class DisciplineApp {
         bonus_points: this.bonusPoints || {}
       };
 
-      const res = await fetch(cloudUrl, {
+      // Cache-Busting URL: Thêm tham số thời gian thực vào URL để tránh cache cũ
+      const cacheBustUrl = cloudUrl.includes('?')
+        ? `${cloudUrl}&_t=${Date.now()}`
+        : `${cloudUrl}?_t=${Date.now()}`;
+
+      const res = await fetch(cacheBustUrl, {
         method: method,
         mode: 'cors',
+        cache: 'no-store',
         headers: headers,
         body: JSON.stringify(payload)
       });
@@ -5243,9 +5281,10 @@ class DisciplineApp {
     const cloudUrl = this.getCloudUrl();
     if (!cloudUrl) return false;
 
-    // Giới hạn tần suất gọi tối thiểu 2 giây giữa các lần để tránh nghẽn mạng
+    // Giới hạn tần suất gọi tối thiểu 3 giây giữa các lần để tránh nghẽn mạng
+    // (giá trị tăng từ 2s → 3s cho phù hợp với polling 10s mới)
     const now = Date.now();
-    if (this._lastPullTime && (now - this._lastPullTime < 2000)) {
+    if (this._lastPullTime && (now - this._lastPullTime < 3000)) {
       return false;
     }
     this._lastPullTime = now;

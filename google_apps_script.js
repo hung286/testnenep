@@ -421,7 +421,7 @@ function saveRawData(ss, jsonString) {
  * Đọc JSON nguyên bản từ sheet HeThong_Data
  */
 function loadRawData(ss) {
-  var sheet = ss.getSheetByName(SHERAW_DATA());
+  var sheet = ss.getSheetByName(SHEET_RAW_DATA);
   if (!sheet) return null;
 
   var lastRow = sheet.getLastRow();
