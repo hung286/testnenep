@@ -160,6 +160,12 @@
           <span id="lock-badge-tab-backup" class="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">🔒 Admin</span>
         </button>
 
+        <button data-tab="tab-audit-logs" class="tab-btn flex items-center gap-2 px-4 py-2.5 text-slate-600 hover:text-slate-900 rounded-t-lg transition border-b-2 border-transparent">
+          <i data-lucide="shield-alert" class="w-4 h-4 text-purple-600"></i>
+          <span>Lịch Sử Thao Tác</span>
+          <span id="lock-badge-tab-audit" class="text-[10px] bg-amber-100 text-amber-800 border border-amber-300 font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">🔒 Admin</span>
+        </button>
+
       </div>
     </div>
   </nav>
@@ -1228,6 +1234,153 @@
 
     </div>
 
+  
+    <!-- ================================================================ -->
+    <!-- TAB 7: LỊCH SỬ THAO TÁC HỆ THỐNG (AUDIT LOG - ADMIN 2806)        -->
+    <!-- ================================================================ -->
+    <div id="tab-audit-logs" class="tab-content hidden space-y-6">
+      
+      <!-- Top Title Banner -->
+      <div class="bg-gradient-to-r from-purple-900 via-indigo-950 to-slate-900 rounded-2xl p-6 text-white shadow-md relative overflow-hidden">
+        <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-300">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-purple-400"></i>
+              <span>NHẬT KÝ KIỂM TOÁN HỆ THỐNG • BẢO MẬT ADMIN (2806)</span>
+            </div>
+            <h2 class="text-xl md:text-2xl font-extrabold tracking-tight text-white flex items-center gap-2">
+              <span>Lịch Sử Thao Tác & Quản Trị Hệ Thống</span>
+              <span class="text-xs bg-purple-500/30 text-purple-200 border border-purple-400/30 font-semibold px-2 py-0.5 rounded-full">Audit Log</span>
+            </h2>
+            <p class="text-xs md:text-sm text-purple-100 font-normal leading-relaxed max-w-2xl">
+              Tự động ghi lại minh bạch toàn bộ các hành động thêm, sửa, xóa lỗi vi phạm, điều chỉnh điểm số, khóa/mở khóa tuần thi đua và thiết bị thực hiện. Giúp Nhà trường và Ban Quản trị kiểm soát an toàn 100% CSDL.
+            </p>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <button id="btn-export-audit-excel" type="button" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition shadow-md cursor-pointer text-xs">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+              <span>Xuất Excel Lịch Sử</span>
+            </button>
+            <button id="btn-clear-audit-logs" type="button" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-rose-500/20 text-rose-200 hover:text-white font-bold rounded-xl border border-white/20 transition cursor-pointer text-xs">
+              <i data-lucide="trash" class="w-4 h-4 text-rose-400"></i>
+              <span>Dọn Dẹp Lịch Sử</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick KPI Stats Row -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+          <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span class="font-bold uppercase text-slate-600">Tổng Thao Tác</span>
+            <i data-lucide="activity" class="w-4 h-4 text-purple-600"></i>
+          </div>
+          <div class="text-2xl font-extrabold text-slate-900" id="audit-stat-total">0</div>
+          <p class="text-[11px] text-purple-600 font-medium mt-1">Ghi nhận liên tục</p>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+          <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span class="font-bold uppercase text-slate-600">Thêm Vi Phạm</span>
+            <i data-lucide="plus-circle" class="w-4 h-4 text-emerald-600"></i>
+          </div>
+          <div class="text-2xl font-extrabold text-emerald-600" id="audit-stat-added">0</div>
+          <p class="text-[11px] text-slate-500 mt-1">Lượt ghi nhận mới</p>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+          <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span class="font-bold uppercase text-slate-600">Sửa & Xóa Lỗi</span>
+            <i data-lucide="edit-3" class="w-4 h-4 text-amber-600"></i>
+          </div>
+          <div class="text-2xl font-extrabold text-amber-600" id="audit-stat-modified">0</div>
+          <p class="text-[11px] text-slate-500 mt-1">Lượt điều chỉnh dữ liệu</p>
+        </div>
+
+        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs">
+          <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+            <span class="font-bold uppercase text-slate-600">Khóa / Mở Khóa Tuần</span>
+            <i data-lucide="lock" class="w-4 h-4 text-blue-600"></i>
+          </div>
+          <div class="text-2xl font-extrabold text-blue-600" id="audit-stat-locked">0</div>
+          <p class="text-[11px] text-slate-500 mt-1">Niêm phong thi đua</p>
+        </div>
+      </div>
+
+      <!-- Filter & Search Bar -->
+      <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+          <!-- Filter by Action Type -->
+          <div class="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <i data-lucide="filter" class="w-4 h-4 text-purple-600"></i>
+            <span>Loại:</span>
+            <select id="audit-filter-type" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none">
+              <option value="all">Tất cả thao tác</option>
+              <option value="ADD_VIOLATION">Thêm vi phạm</option>
+              <option value="EDIT_VIOLATION">Chỉnh sửa vi phạm</option>
+              <option value="DELETE_VIOLATION">Xóa vi phạm</option>
+              <option value="LOCK_WEEK">Khóa tuần thi đua</option>
+              <option value="UNLOCK_WEEK">Mở khóa tuần</option>
+              <option value="BONUS_POINT">Cộng điểm thi đua</option>
+              <option value="SNAPSHOT">Sao lưu & Phục hồi</option>
+              <option value="LOGIN">Đăng nhập hệ thống</option>
+            </select>
+          </div>
+
+          <!-- Filter by Actor/Role -->
+          <div class="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+            <span>Vai trò:</span>
+            <select id="audit-filter-actor" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-purple-500 outline-none">
+              <option value="all">Tất cả người dùng</option>
+              <option value="admin">Quản trị viên (Admin 2806)</option>
+              <option value="supervisor">Giám thị / Cờ đỏ (lhp38)</option>
+            </select>
+          </div>
+
+          <!-- Search Query Input -->
+          <div class="relative flex-1 min-w-[200px]">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" id="audit-filter-search" placeholder="Tìm theo tên học sinh, lớp, nội dung, thiết bị..." class="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none">
+          </div>
+        </div>
+
+        <button id="btn-refresh-audit-logs" type="button" class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition cursor-pointer">
+          <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-slate-600"></i>
+          <span>Làm Mới</span>
+        </button>
+      </div>
+
+      <!-- Main Audit Logs Table -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold uppercase text-[11px]">
+                <th class="py-3 px-3 text-center w-12">STT</th>
+                <th class="py-3 px-3 w-40">Thời Gian & Ngày</th>
+                <th class="py-3 px-3 w-44">Người Thực Hiện</th>
+                <th class="py-3 px-3 w-36 text-center">Hành Động</th>
+                <th class="py-3 px-3">Chi Tiết Thao Tác Cụ Thể</th>
+                <th class="py-3 px-3 w-44">Thiết Bị & Môi Trường</th>
+              </tr>
+            </thead>
+            <tbody id="audit-logs-table-body" class="divide-y divide-slate-100">
+              <!-- Dynamically populated rows -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Empty State -->
+        <div id="audit-logs-empty-state" class="hidden py-16 text-center text-slate-400">
+          <i data-lucide="inbox" class="w-12 h-12 mx-auto text-slate-300 mb-2"></i>
+          <p class="text-sm font-bold text-slate-700">Chưa có bản ghi lịch sử thao tác nào</p>
+          <p class="text-xs text-slate-400 mt-1">Các thao tác thêm, sửa, xóa lỗi hoặc khóa tuần sẽ tự động hiển thị tại đây.</p>
+        </div>
+      </div>
+
+    </div>
   </main>
 
   <!-- ==================== FOOTER ==================== -->

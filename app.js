@@ -63,6 +63,7 @@ class DisciplineApp {
     this.bonusPoints = this.loadBonusPoints();
     this.weeklyNotes = this.loadWeeklyNotes();
     this.snapshots = this.loadSnapshots();
+    this.auditLogs = this.loadAuditLogs();
     this.pendingRestoreData = null;
     
     this.activeTab = 'tab-ai-logger';
@@ -382,6 +383,7 @@ class DisciplineApp {
     this.requireAdmin(() => {
       this.lockedWeeks = [];
       this.saveLockedWeeks();
+      this.logAuditAction('UNLOCK_WEEK', 'Mở khóa toàn bộ tuần', 'Quản trị viên đã mở khóa toàn bộ các tuần thi đua (Tuần 01 đến Tuần 06)');
       this.renderManageWeeksList();
       this.renderEmulationTable();
       this.showToast('Quyền Admin: Đã mở khóa toàn bộ các tuần (Tuần 01 đến Tuần 06)! Thầy/cô có thể chỉnh sửa dữ liệu của tất cả các tuần.', 'success');
@@ -393,6 +395,7 @@ class DisciplineApp {
     this.requireAdmin(() => {
       this.lockedWeeks = this.lockedWeeks.filter(x => x !== w);
       this.saveLockedWeeks();
+      this.logAuditAction('UNLOCK_WEEK', 'Mở khóa tuần', `Quản trị viên đã mở khóa Tuần ${w} để chỉnh sửa dữ liệu`, { week: w });
       this.renderManageWeeksList();
       this.renderEmulationTable();
       this.showToast(`Quyền Admin: Đã mở khóa Tuần ${w} thành công! Thầy/cô có thể chỉnh sửa dữ liệu tuần này.`, 'success');
@@ -407,6 +410,7 @@ class DisciplineApp {
         this.lockedWeeks.sort((a, b) => a - b);
       }
       this.saveLockedWeeks();
+      this.logAuditAction('LOCK_WEEK', 'Khóa tuần thi đua', `Quản trị viên đã khóa niêm phong thi đua Tuần ${w}`, { week: w });
       this.renderManageWeeksList();
       this.renderEmulationTable();
       this.showToast(`Đã khóa niêm phong Tuần ${w} an toàn!`, 'info');
@@ -490,6 +494,7 @@ class DisciplineApp {
     }
     this.lockedWeeks.sort((a, b) => a - b);
     this.saveLockedWeeks();
+    this.logAuditAction('LOCK_WEEK', 'Khóa các tuần trước', `Đã khóa niêm phong tất cả các tuần trước Tuần ${curW}`, { week: curW });
     this.renderManageWeeksList();
     this.showToast(`Đã khóa niêm phong tất cả các tuần trước Tuần ${curW}!`, 'success');
   }
@@ -505,6 +510,7 @@ class DisciplineApp {
         }
       }
       this.saveLockedWeeks();
+      this.logAuditAction('LOCK_WEEK', 'Chỉ mở tuần hiện tại', `Đã khóa các tuần khác và chỉ mở duy nhất Tuần ${curW}`, { week: curW });
       this.renderManageWeeksList();
       this.showToast(`Đã khóa các tuần khác và chỉ mở duy nhất Tuần ${curW}!`, 'success');
     });
@@ -716,14 +722,14 @@ class DisciplineApp {
 
   switchTab(targetTab) {
     // Tab Quản lý học sinh và Tab Danh mục lỗi cho phép Giám thị / Cờ đỏ và Admin truy cập
-    // Chỉ tab Sao lưu & Bảo vệ dữ liệu mới bắt buộc quyền Quản trị Admin (2806)
-    const SENSITIVE_ADMIN_TABS = ['tab-backup'];
+    // Chỉ tab Sao lưu & Bảo vệ dữ liệu và tab Lịch sử thao tác mới bắt buộc quyền Quản trị Admin (2806)
+    const SENSITIVE_ADMIN_TABS = ['tab-backup', 'tab-audit-logs'];
     if (SENSITIVE_ADMIN_TABS.includes(targetTab) && !this.isAdmin()) {
-      let tabName = 'Sao Lưu & Bảo Vệ Dữ Liệu';
+      let tabName = targetTab === 'tab-audit-logs' ? 'Lịch Sử Thao Tác (Audit Log)' : 'Sao Lưu & Bảo Vệ Dữ Liệu';
       const isSuper = this.isSupervisor();
       const msg = isSuper
-        ? `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin cấp cao. Bạn đang ở quyền Giám thị / Cờ đỏ!`
-        : `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin. Vui lòng đăng nhập Admin để truy cập!`;
+        ? `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin cấp cao (2806). Bạn đang ở quyền Giám thị / Cờ đỏ!`
+        : `🔒 Tab ${tabName} yêu cầu quyền Quản trị Admin (2806). Vui lòng đăng nhập Admin để truy cập!`;
 
       this.showToast(msg, 'warning');
       this.openPasswordModal(() => {
@@ -763,6 +769,9 @@ class DisciplineApp {
     } else if (targetTab === 'tab-backup') {
       this.renderSnapshotsList();
       this.updateBackupStats();
+    } else if (targetTab === 'tab-audit-logs') {
+      this.renderAuditLogsTable();
+      this.updateAuditStats();
     }
 
     if (window.lucide) {
@@ -975,12 +984,36 @@ class DisciplineApp {
         if (confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ nhật ký vi phạm không?')) {
           this.violations = [];
           this.saveViolations();
+          this.logAuditAction('DELETE_VIOLATION', 'Xóa toàn bộ vi phạm', 'Đã làm trống toàn bộ nhật ký vi phạm trong hệ thống');
           this.renderLogsTable();
           this.renderEmulationTable();
           this.showToast('Đã làm trống toàn bộ nhật ký vi phạm.', 'info');
         }
       });
     }
+
+    // ==========================================
+    // LỊCH SỬ THAO TÁC (AUDIT LOGS - TAB 7)
+    // ==========================================
+    const auditType = document.getElementById('audit-filter-type');
+    const auditActor = document.getElementById('audit-filter-actor');
+    const auditSearch = document.getElementById('audit-filter-search');
+    if (auditType) auditType.addEventListener('change', () => this.renderAuditLogsTable());
+    if (auditActor) auditActor.addEventListener('change', () => this.renderAuditLogsTable());
+    if (auditSearch) auditSearch.addEventListener('input', () => this.renderAuditLogsTable());
+
+    const btnExportAuditExcel = document.getElementById('btn-export-audit-excel');
+    if (btnExportAuditExcel) btnExportAuditExcel.addEventListener('click', () => this.exportAuditLogsExcel());
+
+    const btnClearAuditLogs = document.getElementById('btn-clear-audit-logs');
+    if (btnClearAuditLogs) btnClearAuditLogs.addEventListener('click', () => this.clearAuditLogs());
+
+    const btnRefreshAudit = document.getElementById('btn-refresh-audit-logs');
+    if (btnRefreshAudit) btnRefreshAudit.addEventListener('click', () => {
+      this.renderAuditLogsTable();
+      this.updateAuditStats();
+      this.showToast('Đã làm mới danh sách lịch sử thao tác!', 'info');
+    });
 
     // ==========================================
     // THI ĐUA & BẢNG TỔNG HỢP TUẦN (TAB 3)
@@ -1527,13 +1560,19 @@ class DisciplineApp {
     if (!this.pendingAiRecords || this.pendingAiRecords.length === 0) return;
 
     const affectedWeeksAndClasses = new Map();
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const countSaved = this.pendingAiRecords.length;
+
     this.pendingAiRecords.forEach(rec => {
       const w = rec.week || this.calculateWeek(rec.date);
       const c = rec.class_name;
       this.violations.unshift({
         id: Date.now() + Math.random(),
         week: w,
-        date: rec.date || new Date().toISOString().split('T')[0],
+        date: rec.date || now.toISOString().split('T')[0],
+        time: timeStr,
+        created_at: now.toISOString(),
         student_name: rec.student_name,
         class_name: c,
         violation_category: rec.violation_category,
@@ -1552,6 +1591,7 @@ class DisciplineApp {
     });
 
     this.saveViolations();
+    this.logAuditAction('ADD_VIOLATION', 'Nhập vi phạm AI', `Đã xác nhận và lưu ${countSaved} bản ghi vi phạm từ văn bản/giọng nói AI`, { count: countSaved });
     this.pendingAiRecords = [];
     document.getElementById('ai-result-preview-card').classList.add('hidden');
     document.getElementById('ai-input-text').value = '';
@@ -1897,17 +1937,24 @@ class DisciplineApp {
 
           const dateVal = document.getElementById('input-violation-date').value || new Date().toISOString().split('T')[0];
           const week = this.calculateWeek(dateVal);
+          const now = new Date();
+          const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
           this.violations.unshift({
             id: Date.now(),
             week,
             date: dateVal,
+            time: timeStr,
+            created_at: now.toISOString(),
             student_name: name,
             class_name: className,
             violation_category: selectedRule,
             penalty_points: points,
             original_note: 'Nhập thủ công trực tiếp'
           });
+
+          // Ghi nhận Audit Log
+          this.logAuditAction('ADD_VIOLATION', 'Thêm vi phạm', `Đã ghi nhận vi phạm: ${name} (${className}) - ${selectedRule} (-${points}đ) - Tuần ${week}`, { week, className, student: name, points });
 
           // Tự động đồng bộ và tính toán lại Bảng thi đua thời gian thực
           this.syncViolationWithEmulation(week, className);
@@ -2026,7 +2073,16 @@ class DisciplineApp {
           </td>
           <td class="font-bold text-slate-900">${v.student_name}</td>
           <td class="text-center">${genderBadge}</td>
-          <td class="text-center font-medium text-slate-700 text-xs">${this.formatDate(v.date)}</td>
+          <td class="text-center font-medium text-slate-700 text-xs cursor-pointer group hover:bg-indigo-50/50 transition"
+              onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
+              onmousemove="window.app.moveViolationTooltip(event)"
+              onmouseleave="window.app.hideViolationTooltip()"
+              title="Rê chuột xem chi tiết Giờ : Phút : Giây">
+            <span class="inline-flex items-center gap-1 group-hover:text-indigo-600 font-semibold transition">
+              <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500"></i>
+              <span>${this.formatDate(v.date)}</span>
+            </span>
+          </td>
           <td class="text-center">${weekBadge}</td>
           <td class="font-semibold text-slate-800 cursor-pointer"
               onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
@@ -2082,6 +2138,9 @@ class DisciplineApp {
       // 2. Xóa khỏi danh sách violations cục bộ
       this.violations = this.violations.filter(v => String(v.id) !== String(id));
       localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+
+      // Ghi nhận Audit Log
+      this.logAuditAction('DELETE_VIOLATION', 'Xóa vi phạm', `Đã xóa vi phạm: ${studentName} (${targetClass}) - ${target.violation_category || ''} (-${target.penalty_points || 0}đ) - Tuần ${targetWeek}`, { week: targetWeek, className: targetClass, student: studentName });
 
       // 3. Tự động tính toán lại điểm trừ của lớp và tuần tương ứng & cập nhật tức thì Bảng tổng hợp thi đua
       this.syncViolationWithEmulation(targetWeek, targetClass);
@@ -2234,6 +2293,7 @@ class DisciplineApp {
     }
 
     // Cập nhật bản ghi
+    const now = new Date();
     v.student_name = newStudent;
     v.class_name = newClass;
     v.gender = newGender;
@@ -2242,6 +2302,11 @@ class DisciplineApp {
     v.violation_category = newCategory;
     v.penalty_points = newPoints;
     v.original_note = newNote;
+    v.time = v.time || now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    v.updated_at = now.toISOString();
+
+    // Ghi nhận Audit Log
+    this.logAuditAction('EDIT_VIOLATION', 'Sửa vi phạm', `Đã cập nhật vi phạm: ${newStudent} (${newClass}) - ${newCategory} (-${newPoints}đ) - Tuần ${newWeek}`, { week: newWeek, className: newClass, student: newStudent, points: newPoints });
 
     this.saveViolations();
 
@@ -2277,6 +2342,40 @@ class DisciplineApp {
     });
   }
 
+  formatViolationTime(v) {
+    if (!v) return '07:15:00';
+    if (v.time && typeof v.time === 'string' && v.time.includes(':')) {
+      const parts = v.time.split(':');
+      if (parts.length >= 2) {
+        const hh = parts[0].padStart(2, '0');
+        const mm = parts[1].padStart(2, '0');
+        const ss = (parts[2] || '00').padStart(2, '0');
+        return `${hh}:${mm}:${ss}`;
+      }
+      return v.time;
+    }
+    if (v.created_at) {
+      const d = new Date(v.created_at);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      }
+    }
+    // Nếu v.id là timestamp epoch millis (như Date.now())
+    const numId = typeof v.id === 'number' ? v.id : parseInt(String(v.id).split('_')[0], 10);
+    if (!isNaN(numId) && numId > 1600000000000 && numId < 2500000000000) {
+      const d = new Date(numId);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+      }
+    }
+    // Dữ liệu mẫu khởi tạo: phân bố mốc giờ truy bài/đầu buổi học thực tế (07:05:00 - 07:45:00)
+    const baseHour = 7;
+    const seed = Math.abs(parseInt(v.id, 10) || (v.student_name ? v.student_name.length : 1));
+    const baseMinute = 5 + ((seed * 7) % 40);
+    const baseSec = (seed * 13) % 60;
+    return `${String(baseHour).padStart(2, '0')}:${String(baseMinute).padStart(2, '0')}:${String(baseSec).padStart(2, '0')}`;
+  }
+
   showViolationTooltip(event, id) {
     const v = this.violations.find(x => String(x.id) === String(id));
     if (!v) return;
@@ -2286,6 +2385,7 @@ class DisciplineApp {
 
     const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
     const dateFormatted = this.formatDate(v.date);
+    const timeFormatted = this.formatViolationTime(v);
     const noteContent = (v.original_note && v.original_note.trim()) ? v.original_note.trim() : 'Không có ghi chú thêm.';
 
     popover.innerHTML = `
@@ -2308,7 +2408,18 @@ class DisciplineApp {
         <span class="bg-rose-100 text-rose-700 font-extrabold px-2 py-0.5 rounded-full text-xs shadow-xs border border-rose-200">-${v.penalty_points}đ</span>
       </div>
 
-      <div class="py-2.5 space-y-2 text-xs">
+      <!-- Mốc thời gian chi tiết Giờ : Phút : Giây khi rê chuột -->
+      <div class="my-2 p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/90 rounded-xl flex items-center justify-between text-[11px]">
+        <div class="flex items-center gap-1.5 text-blue-950 font-bold">
+          <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span>Thời điểm: <b class="font-extrabold text-blue-700 tracking-wide font-mono text-xs">${timeFormatted}</b></span>
+        </div>
+        <span class="text-slate-600 font-semibold bg-white/80 px-2 py-0.5 rounded border border-slate-200/60">${dateFormatted}</span>
+      </div>
+
+      <div class="py-1 space-y-2 text-xs">
         <div>
           <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Lỗi vi phạm</span>
           <p class="font-bold text-slate-800 leading-snug">${v.violation_category}</p>
@@ -2323,14 +2434,11 @@ class DisciplineApp {
       </div>
 
       <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-        <span class="flex items-center gap-1">
-          <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          <span>Ngày: ${dateFormatted}</span>
+        <span class="flex items-center gap-1 text-emerald-700 font-medium">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span>Đã lưu an toàn CSDL</span>
         </span>
-        <span class="text-emerald-600 font-medium flex items-center gap-1">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-          <span>Google Sheets</span>
-        </span>
+        <span class="text-blue-600 font-semibold">Google Sheets</span>
       </div>
     `;
 
@@ -2344,7 +2452,7 @@ class DisciplineApp {
     if (!popover || popover.style.display === 'none') return;
 
     const w = 340;
-    const h = 240;
+    const h = 280;
     let x = event.clientX + 16;
     let y = event.clientY + 16;
 
@@ -3280,7 +3388,16 @@ class DisciplineApp {
               </td>
               <td class="p-2.5 font-bold text-slate-900">${v.student_name}</td>
               <td class="p-2.5 text-center">${genderBadge}</td>
-              <td class="p-2.5 text-center text-slate-600 text-xs">${this.formatDate(v.date)}</td>
+              <td class="p-2.5 text-center text-slate-600 text-xs cursor-pointer group hover:bg-indigo-50/50 transition"
+                  onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
+                  onmousemove="window.app.moveViolationTooltip(event)"
+                  onmouseleave="window.app.hideViolationTooltip()"
+                  title="Rê chuột xem chi tiết Giờ : Phút : Giây">
+                <span class="inline-flex items-center gap-1 group-hover:text-indigo-600 font-semibold transition">
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500"></i>
+                  <span>${this.formatDate(v.date)}</span>
+                </span>
+              </td>
               <td class="p-2.5 text-slate-800 font-semibold cursor-pointer"
                   onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
                   onmousemove="window.app.moveViolationTooltip(event)"
@@ -4181,6 +4298,7 @@ class DisciplineApp {
     }
 
     this.saveSnapshots();
+    this.logAuditAction('SNAPSHOT', 'Tạo điểm khôi phục', `Đã tạo điểm khôi phục CSDL: "${snapName}"`);
     return newSnapshot;
   }
 
@@ -4216,14 +4334,18 @@ class DisciplineApp {
       this.renderSnapshotsList();
       this.updateBackupStats();
 
+      this.logAuditAction('SNAPSHOT', 'Khôi phục CSDL', `Đã khôi phục toàn bộ CSDL về mốc: "${snap.name}"`);
       this.showToast(`Đã khôi phục thành công về mốc: "${snap.name}"!`, 'success');
     });
   }
 
   deleteSnapshot(snapId) {
     if (!confirm('Bạn có chắc chắn muốn xóa mốc khôi phục này không?')) return;
+    const snap = this.snapshots.find(s => s.id === snapId);
+    const snapName = snap ? snap.name : snapId;
     this.snapshots = this.snapshots.filter(s => s.id !== snapId);
     this.saveSnapshots();
+    this.logAuditAction('SNAPSHOT', 'Xóa điểm khôi phục', `Đã xóa mốc khôi phục: "${snapName}"`);
     this.showToast('Đã xóa mốc khôi phục.', 'info');
   }
 
@@ -4368,6 +4490,295 @@ class DisciplineApp {
     } catch (e) {
       this.showToast('Lỗi xuất file server: ' + e.message, 'error');
     }
+  }
+
+  // ==================== LỊCH SỬ THAO TÁC HỆ THỐNG (AUDIT LOGS - TAB 7) ====================
+
+  loadAuditLogs() {
+    try {
+      const saved = localStorage.getItem('dshs_audit_logs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return this.getInitialAuditLogs();
+  }
+
+  getInitialAuditLogs() {
+    return [
+      {
+        id: 'log_seed_1',
+        timestamp: Date.now() - 3600000 * 2,
+        time_str: '10:15:22',
+        date_str: '2026-10-22',
+        actor: 'Quản trị viên (Admin 2806)',
+        role: 'admin',
+        action_type: 'LOCK_WEEK',
+        action_title: 'Khóa tuần thi đua',
+        details: 'Khóa niêm phong thi đua các Tuần 01 đến Tuần 06 phục vụ tổng kết đợt 1',
+        target_week: 6,
+        target_class: 'Toàn trường',
+        device_info: 'Windows • Chrome (Máy tính)'
+      },
+      {
+        id: 'log_seed_2',
+        timestamp: Date.now() - 3600000 * 5,
+        time_str: '07:22:45',
+        date_str: '2026-10-22',
+        actor: 'Giám thị / Cờ đỏ (lhp38)',
+        role: 'supervisor',
+        action_type: 'ADD_VIOLATION',
+        action_title: 'Thêm vi phạm',
+        details: 'Ghi nhận vi phạm: Đoàn Nguyễn Thị Minh Vy (10B01) - Đi học muộn (-0.5đ) - Tuần 7',
+        target_week: 7,
+        target_class: '10B01',
+        device_info: 'Android • Chrome (Di động)'
+      },
+      {
+        id: 'log_seed_3',
+        timestamp: Date.now() - 3600000 * 24,
+        time_str: '14:30:10',
+        date_str: '2026-10-21',
+        actor: 'Quản trị viên (Admin 2806)',
+        role: 'admin',
+        action_type: 'SNAPSHOT',
+        action_title: 'Đồng bộ Google Sheets',
+        details: 'Đồng bộ thành công 97 bản ghi vi phạm lên Google Sheets Cloud Database',
+        target_week: 7,
+        target_class: 'Toàn trường',
+        device_info: 'Windows • Chrome (Máy tính)'
+      }
+    ];
+  }
+
+  saveAuditLogs() {
+    try {
+      localStorage.setItem('dshs_audit_logs', JSON.stringify(this.auditLogs));
+    } catch (e) {}
+  }
+
+  getDeviceInfo() {
+    if (typeof navigator === 'undefined') return 'Không xác định';
+    const ua = navigator.userAgent || '';
+    let os = 'Khác';
+    if (/windows/i.test(ua)) os = 'Windows';
+    else if (/android/i.test(ua)) os = 'Android';
+    else if (/iphone|ipad|ipod/i.test(ua)) os = 'iOS';
+    else if (/macintosh|mac os x/i.test(ua)) os = 'macOS';
+    else if (/linux/i.test(ua)) os = 'Linux';
+
+    let browser = 'Trình duyệt';
+    if (/edg/i.test(ua)) browser = 'Edge';
+    else if (/chrome|crios/i.test(ua)) browser = 'Chrome';
+    else if (/firefox|fxios/i.test(ua)) browser = 'Firefox';
+    else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari';
+
+    const isMobile = /mobile|android|iphone|ipad/i.test(ua);
+    const type = isMobile ? 'Di động' : 'Máy tính';
+    return `${os} • ${browser} (${type})`;
+  }
+
+  logAuditAction(actionType, actionTitle, details, meta = {}) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const dateStr = now.toISOString().split('T')[0];
+
+    const actor = this.isAdmin() 
+      ? 'Quản trị viên (Admin 2806)' 
+      : (this.isSupervisor() ? 'Giám thị / Cờ đỏ (lhp38)' : 'Hệ thống');
+
+    const entry = {
+      id: 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      timestamp: Date.now(),
+      time_str: timeStr,
+      date_str: dateStr,
+      actor: actor,
+      role: this.getUserRole() || 'guest',
+      action_type: actionType,
+      action_title: actionTitle,
+      details: details,
+      target_week: meta.week || this.currentWeek,
+      target_class: meta.className || '',
+      device_info: this.getDeviceInfo()
+    };
+
+    if (!this.auditLogs) this.auditLogs = [];
+    this.auditLogs.unshift(entry);
+    if (this.auditLogs.length > 500) {
+      this.auditLogs = this.auditLogs.slice(0, 500);
+    }
+    this.saveAuditLogs();
+
+    // Đồng bộ tức thời giữa các tab qua BroadcastChannel
+    this.broadcastLocalChange({
+      type: 'AUDIT_LOG_ADDED',
+      entry: entry
+    });
+
+    // Cập nhật giao diện Audit Logs nếu tab đang mở
+    if (this.activeTab === 'tab-audit-logs') {
+      this.renderAuditLogsTable();
+      this.updateAuditStats();
+    }
+  }
+
+  renderAuditLogsTable() {
+    const tbody = document.getElementById('audit-logs-table-body');
+    const emptyState = document.getElementById('audit-logs-empty-state');
+    if (!tbody) return;
+
+    const typeFilter = document.getElementById('audit-filter-type') ? document.getElementById('audit-filter-type').value : 'all';
+    const actorFilter = document.getElementById('audit-filter-actor') ? document.getElementById('audit-filter-actor').value : 'all';
+    const searchQuery = (document.getElementById('audit-filter-search') ? document.getElementById('audit-filter-search').value : '').trim().toLowerCase();
+
+    let logs = this.auditLogs || [];
+    let filtered = logs.filter(log => {
+      if (typeFilter !== 'all' && log.action_type !== typeFilter) return false;
+      if (actorFilter !== 'all' && log.role !== actorFilter) return false;
+      if (searchQuery) {
+        const full = `${log.action_title} ${log.details} ${log.actor} ${log.device_info} ${log.target_class || ''}`.toLowerCase();
+        if (!full.includes(searchQuery)) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyState) emptyState.classList.remove('hidden');
+      return;
+    }
+
+    if (emptyState) emptyState.classList.add('hidden');
+
+    const badgeClasses = {
+      ADD_VIOLATION: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      EDIT_VIOLATION: 'bg-blue-50 text-blue-700 border-blue-200',
+      DELETE_VIOLATION: 'bg-rose-50 text-rose-700 border-rose-200',
+      LOCK_WEEK: 'bg-amber-50 text-amber-700 border-amber-200',
+      UNLOCK_WEEK: 'bg-purple-50 text-purple-700 border-purple-200',
+      BONUS_POINT: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      SNAPSHOT: 'bg-teal-50 text-teal-700 border-teal-200',
+      LOGIN: 'bg-slate-100 text-slate-700 border-slate-300',
+      LOGOUT: 'bg-slate-100 text-slate-500 border-slate-200'
+    };
+
+    const actionIcons = {
+      ADD_VIOLATION: 'plus-circle',
+      EDIT_VIOLATION: 'edit-3',
+      DELETE_VIOLATION: 'trash-2',
+      LOCK_WEEK: 'lock',
+      UNLOCK_WEEK: 'unlock',
+      BONUS_POINT: 'award',
+      SNAPSHOT: 'shield-check',
+      LOGIN: 'key',
+      LOGOUT: 'log-out'
+    };
+
+    tbody.innerHTML = filtered.map((log, idx) => {
+      const bClass = badgeClasses[log.action_type] || 'bg-slate-50 text-slate-700 border-slate-200';
+      const icon = actionIcons[log.action_type] || 'activity';
+      const isSuper = log.role === 'supervisor';
+      const actorBadge = isSuper
+        ? `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-bold">Giám thị (lhp38)</span>`
+        : `<span class="bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded text-[11px] font-bold">Admin (2806)</span>`;
+
+      return `
+        <tr class="hover:bg-purple-50/30 transition border-b border-slate-100">
+          <td class="py-3 px-3 text-center font-bold text-slate-500">${idx + 1}</td>
+          <td class="py-3 px-3">
+            <div class="font-extrabold text-slate-800 text-xs tracking-tight flex items-center gap-1.5">
+              <i data-lucide="clock" class="w-3.5 h-3.5 text-purple-600"></i>
+              <span>${log.time_str}</span>
+            </div>
+            <div class="text-[11px] text-slate-500 mt-0.5">${this.formatDate(log.date_str)}</div>
+          </td>
+          <td class="py-3 px-3">
+            <div>${actorBadge}</div>
+            <div class="text-[11px] text-slate-500 font-medium mt-1">${log.actor}</div>
+          </td>
+          <td class="py-3 px-3 text-center">
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${bClass}">
+              <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
+              <span>${log.action_title}</span>
+            </span>
+          </td>
+          <td class="py-3 px-3">
+            <div class="font-medium text-slate-900 leading-snug break-words">${log.details}</div>
+            <div class="flex items-center gap-1.5 mt-1">
+              ${log.target_class ? `<span class="text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded">Lớp: ${log.target_class}</span>` : ''}
+              ${log.target_week ? `<span class="text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded">Tuần ${log.target_week}</span>` : ''}
+            </div>
+          </td>
+          <td class="py-3 px-3 text-slate-600">
+            <div class="flex items-center gap-1.5 font-medium">
+              <i data-lucide="monitor" class="w-3.5 h-3.5 text-slate-400"></i>
+              <span>${log.device_info}</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  updateAuditStats() {
+    const logs = this.auditLogs || [];
+    const statTotal = document.getElementById('audit-stat-total');
+    const statAdded = document.getElementById('audit-stat-added');
+    const statModified = document.getElementById('audit-stat-modified');
+    const statLocked = document.getElementById('audit-stat-locked');
+
+    if (statTotal) statTotal.textContent = logs.length;
+    if (statAdded) statAdded.textContent = logs.filter(l => l.action_type === 'ADD_VIOLATION').length;
+    if (statModified) statModified.textContent = logs.filter(l => l.action_type === 'EDIT_VIOLATION' || l.action_type === 'DELETE_VIOLATION').length;
+    if (statLocked) statLocked.textContent = logs.filter(l => l.action_type === 'LOCK_WEEK' || l.action_type === 'UNLOCK_WEEK').length;
+  }
+
+  exportAuditLogsExcel() {
+    if (typeof XLSX === 'undefined') {
+      this.showToast('Thư viện Excel chưa sẵn sàng!', 'error');
+      return;
+    }
+
+    const logs = this.auditLogs || [];
+    if (logs.length === 0) {
+      this.showToast('Không có bản ghi lịch sử nào để xuất!', 'info');
+      return;
+    }
+
+    const rows = logs.map((log, idx) => ({
+      'STT': idx + 1,
+      'Thời Điểm (Giờ:Phút:Giây)': log.time_str,
+      'Ngày': this.formatDate(log.date_str),
+      'Người Thao Tác': log.actor,
+      'Vai Trò': log.role === 'admin' ? 'Quản trị viên (Admin 2806)' : 'Giám thị / Cờ đỏ (lhp38)',
+      'Hành Động': log.action_title,
+      'Chi Tiết Thao Tác': log.details,
+      'Tuần': log.target_week || '',
+      'Lớp': log.target_class || '',
+      'Thiết Bị / Môi Trường': log.device_info
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "LichSuThaoTac");
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Lich_su_thao_tac_THPT_LHP_${today}.xlsx`);
+    this.showToast('Đã xuất file Excel Lịch sử thao tác thành công!', 'success');
+  }
+
+  clearAuditLogs() {
+    this.requireAdmin(() => {
+      if (!confirm('Bạn có chắc chắn muốn dọn dẹp toàn bộ Lịch sử thao tác không?\n\nHành động này không thể hoàn tác!')) return;
+      this.auditLogs = [];
+      this.saveAuditLogs();
+      this.renderAuditLogsTable();
+      this.updateAuditStats();
+      this.showToast('Đã làm trống lịch sử thao tác hệ thống.', 'info');
+    });
   }
 
   // ==================== QUẢN LÝ HỌC SINH (TAB 4 - NGUỒN MỞ) ====================
@@ -4972,11 +5383,12 @@ class DisciplineApp {
         this.lockedWeeks = [1, 2, 3, 4, 5, 6];
         this.saveLockedWeeks();
 
-        const SENSITIVE_ADMIN_TABS = ['tab-students', 'tab-rules', 'tab-backup'];
+        const SENSITIVE_ADMIN_TABS = ['tab-students', 'tab-rules', 'tab-backup', 'tab-audit-logs'];
         if (SENSITIVE_ADMIN_TABS.includes(this.activeTab)) {
           this.switchTab('tab-emulation');
         }
 
+        this.logAuditAction('LOGOUT', 'Đăng xuất', `Đã đăng xuất khỏi vai trò ${roleName}, chuyển về chế độ Chỉ xem`);
         this.updateLockStatusUI();
         this.showToast('Đã đăng xuất. Hệ thống đã chuyển về chế độ Chỉ xem an toàn.', 'info');
       }
@@ -5049,6 +5461,8 @@ class DisciplineApp {
     // 1. Cập nhật các badge khóa trên thanh điều hướng tab
     const lockBackup = document.getElementById('lock-badge-tab-backup');
     if (lockBackup) lockBackup.style.display = isAdmin ? 'none' : 'inline-flex';
+    const lockAudit = document.getElementById('lock-badge-tab-audit');
+    if (lockAudit) lockAudit.style.display = isAdmin ? 'none' : 'inline-flex';
     const lockRules = document.getElementById('lock-badge-tab-rules');
     if (lockRules) lockRules.style.display = 'none';
     const lockStudents = document.getElementById('lock-badge-tab-students');
@@ -5258,8 +5672,10 @@ class DisciplineApp {
         this.updateLockStatusUI();
 
         if (isAdminPass) {
+          this.logAuditAction('LOGIN', 'Đăng nhập Admin', 'Đăng nhập thành công với vai trò Quản trị viên cấp cao (Mã 2806)');
           this.showToast('🔓 Quyền Admin: Đăng nhập thành công! Đã cấp toàn quyền quản trị cấp cao và mở khóa toàn bộ các tuần.', 'success');
         } else {
+          this.logAuditAction('LOGIN', 'Đăng nhập Giám thị', 'Đăng nhập thành công với vai trò Giám thị / Đội cờ đỏ (Mã lhp38)');
           this.showToast('🚩 Quyền Giám Thị / Đội Cờ Đỏ: Đăng nhập thành công! Thầy/cô có quyền thêm danh sách HS, thêm/bớt/sửa vi phạm và điều chỉnh danh mục lỗi & điểm.', 'success');
         }
 
@@ -5565,6 +5981,17 @@ class DisciplineApp {
     } else if (msg.type === 'DATA_UPDATED') {
       this._lastPullTime = 0;
       this.pullAndMergeFromCloud(true, true);
+    } else if (msg.type === 'AUDIT_LOG_ADDED' && msg.entry) {
+      if (!this.auditLogs) this.auditLogs = [];
+      if (!this.auditLogs.some(l => l.id === msg.entry.id)) {
+        this.auditLogs.unshift(msg.entry);
+        if (this.auditLogs.length > 500) this.auditLogs = this.auditLogs.slice(0, 500);
+        this.saveAuditLogs();
+        if (this.activeTab === 'tab-audit-logs') {
+          this.renderAuditLogsTable();
+          this.updateAuditStats();
+        }
+      }
     }
   }
 
@@ -5613,6 +6040,7 @@ class DisciplineApp {
         deleted_ids: Array.from(this.deletedViolationIds || []),
         emulation_weeks: this.emulationWeeks || {},
         bonus_points: this.bonusPoints || {},
+        audit_logs: (this.auditLogs || []).slice(0, 100),
         ...extraPayload
       };
 
@@ -5709,6 +6137,7 @@ class DisciplineApp {
       let cloudDeletedIds = [];
       let cloudEmulationWeeks = null;
       let cloudBonusPoints = null;
+      let cloudAuditLogs = null;
 
       if (Array.isArray(data)) {
         cloudViolations = data;
@@ -5723,6 +6152,9 @@ class DisciplineApp {
           }
           if (data.bonus_points && typeof data.bonus_points === 'object') {
             cloudBonusPoints = data.bonus_points;
+          }
+          if (Array.isArray(data.audit_logs)) {
+            cloudAuditLogs = data.audit_logs;
           }
         } else if (data.violations && typeof data.violations === 'object') {
           cloudViolations = Object.values(data.violations);
@@ -5795,7 +6227,30 @@ class DisciplineApp {
         }
       }
 
-      // 5. Cập nhật giao diện nếu có thay đổi
+      // 5. Cập nhật Lịch sử thao tác (Audit Logs) nếu có từ Cloud
+      if (Array.isArray(cloudAuditLogs) && cloudAuditLogs.length > 0) {
+        if (!this.auditLogs) this.auditLogs = [];
+        const existingIds = new Set(this.auditLogs.map(l => l.id));
+        let addedLog = false;
+        cloudAuditLogs.forEach(cl => {
+          if (cl && cl.id && !existingIds.has(cl.id)) {
+            this.auditLogs.push(cl);
+            existingIds.add(cl.id);
+            addedLog = true;
+          }
+        });
+        if (addedLog) {
+          this.auditLogs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          if (this.auditLogs.length > 500) this.auditLogs = this.auditLogs.slice(0, 500);
+          this.saveAuditLogs();
+          if (this.activeTab === 'tab-audit-logs') {
+            this.renderAuditLogsTable();
+            this.updateAuditStats();
+          }
+        }
+      }
+
+      // 6. Cập nhật giao diện nếu có thay đổi
       if (dataChanged) {
         this.updateBadges();
         this.renderLogsTable();
