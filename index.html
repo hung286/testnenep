@@ -1805,7 +1805,7 @@
             <p class="text-xs text-slate-500">Cập nhật thông tin và tự động đồng bộ điểm thi đua</p>
           </div>
         </div>
-        <button type="button" onclick="document.getElementById('modal-edit-violation').classList.add('hidden')" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+        <button type="button" onclick="window.app.closeEditViolationModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
@@ -1866,7 +1866,7 @@
         </div>
 
         <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
-          <button type="button" onclick="document.getElementById('modal-edit-violation').classList.add('hidden')" class="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl font-bold transition cursor-pointer">
+          <button type="button" onclick="window.app.closeEditViolationModal()" class="px-4 py-2 border border-slate-200 text-slate-600 hover:bg-slate-100 rounded-xl font-bold transition cursor-pointer">
             Hủy
           </button>
           <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5">
@@ -2161,6 +2161,11 @@
       </div>
     </div>
   </div>
+
+  <!-- ================================================================ -->
+  <!-- TOOLTIP / POPOVER: CHI TIẾT LỖI VI PHẠM KHI RÊ CHUỘT (HOVER)        -->
+  <!-- ================================================================ -->
+  <div id="violation-tooltip-popover" class="fixed hidden z-[9999] pointer-events-none max-w-sm w-80 bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-2xl rounded-2xl p-3.5 text-xs text-slate-800 transition-opacity duration-150"></div>
 
   <!-- Toast Container -->
   <div id="toast-container"></div>

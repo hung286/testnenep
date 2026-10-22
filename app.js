@@ -3,18 +3,48 @@
  * Xây dựng theo Custom System Instruction & AI_INSTRUCTIONS.md
  */
 
-// ==================== CẤU HÌNH TOÀN CỤC (GLOBAL ENDPOINT CONFIG) ====================
+// ==================== CẤU HÌNH TOÀN CỤC & ENDPOINT CHUẨN GOOGLE APPS SCRIPT ====================
+const OFFICIAL_GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec';
+
 window.GLOBAL_CONFIG = {
   // Đường dẫn Google Apps Script Web App Endpoint chính thức toàn hệ thống
-  DEFAULT_GAS_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec',
-  // Kênh Cloud Registry trung gian để phát tán và tự động đồng bộ Endpoint mới sang mọi điện thoại/máy tính
-  REGISTRY_URL: 'https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/gas_endpoint_registry',
+  DEFAULT_GAS_ENDPOINT: OFFICIAL_GAS_ENDPOINT,
   CONFIG_FILE_URL: 'config.json',
-  VERSION: '2.1.0'
+  VERSION: '2.3.0_GAS_STANDARD'
 };
+
+// Tự động dọn dẹp triệt để cache cũ và link kvdb.io ngay khi tải trang trên mọi thiết bị (điện thoại, máy tính)
+(function purgeLegacyCacheEarly() {
+  try {
+    const CURRENT_STORAGE_VER = '2.3.0_GAS_STANDARD';
+    if (typeof localStorage !== 'undefined') {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k) {
+          const v = localStorage.getItem(k);
+          if (typeof v === 'string' && v.includes('kvdb.io')) {
+            localStorage.removeItem(k);
+          }
+        }
+      }
+      const currentUrl = localStorage.getItem('dshs_cloud_url');
+      if (currentUrl && (currentUrl.includes('kvdb.io') || !currentUrl.includes('script.google.com'))) {
+        localStorage.removeItem('dshs_cloud_url');
+      }
+      if (localStorage.getItem('dshs_storage_version') !== CURRENT_STORAGE_VER) {
+        localStorage.removeItem('dshs_cloud_url');
+        localStorage.removeItem('dshs_cloud_url_updated_at');
+        localStorage.setItem('dshs_storage_version', CURRENT_STORAGE_VER);
+      }
+    }
+  } catch (e) {}
+})();
 
 class DisciplineApp {
   constructor() {
+    // Dọn dẹp cache phiên bản cũ ngay từ constructor
+    this.purgeObsoleteCache();
+
     this.startDate = new Date(2026, 8, 7); // Thứ Hai, 07/09/2026 (Tuần 1)
     
     // Khởi tạo State từ LocalStorage hoặc dữ liệu mặc định
@@ -596,6 +626,9 @@ class DisciplineApp {
   }
 
   init() {
+    // 0. Quét và loại bỏ sạch cache cũ và link kvdb.io
+    this.purgeObsoleteCache();
+
     // 1. Tự động gán và lưu API Key ngầm
     const DEFAULT_API_KEY = typeof atob !== "undefined" ? atob("QVEuQWI4Uk42S05UclVUVEFDaTZoOTQwRW5ETEt1LW1UUTdMcTVldlRsQUx0aVBDSG9jOEE=") : "";
     if (!localStorage.getItem('gemini_api_key')) {
@@ -1978,27 +2011,17 @@ class DisciplineApp {
     tbody.innerHTML = sortedFiltered.map((v, idx) => {
       const isLocked = this.isWeekLocked(v.week);
       let weekBadge = `<span class="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded-full font-bold">T${v.week}</span>`;
-      const isAuth = this.isDataEntryUnlocked();
-      let deleteBtn = '';
-
-      if (!isAuth) {
-        deleteBtn = `
-          <span class="text-slate-300 p-1 flex items-center justify-center" title="Chế độ Chỉ xem (Đăng nhập để sửa/xóa)">
-            <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-300"></i>
-          </span>
-        `;
-      } else {
-        deleteBtn = `
-          <div class="flex items-center justify-center gap-1">
-            <button type="button" onclick="window.app.openEditViolationModal('${v.id}')" class="p-1 text-slate-400 hover:text-blue-600 rounded transition cursor-pointer" title="Sửa bản ghi vi phạm này">
-              <i data-lucide="edit-3" class="w-4 h-4"></i>
-            </button>
-            <button type="button" onclick="window.app.deleteViolation('${v.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer" title="Xóa bản ghi này">
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
-          </div>
-        `;
-      }
+      
+      const actionButtons = `
+        <div class="flex items-center justify-center gap-1">
+          <button type="button" onclick="window.app.openEditViolationModal('${v.id}')" class="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition cursor-pointer" title="Sửa bản ghi vi phạm này">
+            <i data-lucide="edit-3" class="w-4 h-4"></i>
+          </button>
+          <button type="button" onclick="window.app.deleteViolation('${v.id}')" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer" title="Xóa bản ghi này">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      `;
 
       const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
       const genderBadge = gender === 'Nữ'
@@ -2015,12 +2038,26 @@ class DisciplineApp {
           <td class="text-center">${genderBadge}</td>
           <td class="text-center font-medium text-slate-700 text-xs">${this.formatDate(v.date)}</td>
           <td class="text-center">${weekBadge}</td>
-          <td class="font-semibold text-slate-800">${v.violation_category}</td>
+          <td class="font-semibold text-slate-800 cursor-pointer"
+              onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
+              onmousemove="window.app.moveViolationTooltip(event)"
+              onmouseleave="window.app.hideViolationTooltip()">
+            <span class="inline-flex items-center gap-1.5 hover:text-blue-600 transition group">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-blue-500 opacity-60 group-hover:opacity-100"></i>
+              <span class="group-hover:underline underline-offset-2">${v.violation_category}</span>
+            </span>
+          </td>
           <td class="text-center">
             <span class="text-red-600 font-bold bg-red-50 border border-red-200 px-2 py-0.5 rounded text-xs">-${v.penalty_points}đ</span>
           </td>
-          <td class="text-slate-500 text-xs italic">${v.original_note || '-'}</td>
-          <td class="text-center">${deleteBtn}</td>
+          <td class="text-slate-600 text-xs max-w-xs truncate cursor-pointer"
+              title="${v.original_note || ''}"
+              onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
+              onmousemove="window.app.moveViolationTooltip(event)"
+              onmouseleave="window.app.hideViolationTooltip()">
+            ${v.original_note || '—'}
+          </td>
+          <td class="text-center">${actionButtons}</td>
         </tr>
       `;
     }).join('');
@@ -2097,38 +2134,47 @@ class DisciplineApp {
       const modal = document.getElementById('modal-edit-violation');
       if (!modal) return;
 
-      document.getElementById('edit-viol-id').value = v.id;
-      document.getElementById('edit-viol-student').value = v.student_name || '';
+      const editId = document.getElementById('edit-viol-id');
+      const editStudent = document.getElementById('edit-viol-student');
+      const editClass = document.getElementById('edit-viol-class');
+      const editGender = document.getElementById('edit-viol-gender');
+      const editDate = document.getElementById('edit-viol-date');
+      const editWeek = document.getElementById('edit-viol-week');
+      const editCat = document.getElementById('edit-viol-category');
+      const editPoints = document.getElementById('edit-viol-points');
+      const editNote = document.getElementById('edit-viol-note');
 
-      const classSelect = document.getElementById('edit-viol-class');
-      if (classSelect) {
+      if (editId) editId.value = v.id;
+      if (editStudent) editStudent.value = v.student_name || '';
+
+      if (editClass) {
         const classes = (window.DEFAULT_CLASSES || []).map(c => c.class);
-        classSelect.innerHTML = classes.map(c => `<option value="${c}" ${c === v.class_name ? 'selected' : ''}>${c}</option>`).join('');
+        editClass.innerHTML = classes.map(c => `<option value="${c}" ${c === v.class_name ? 'selected' : ''}>${c}</option>`).join('');
+        editClass.value = v.class_name;
       }
 
-      const genderSelect = document.getElementById('edit-viol-gender');
-      if (genderSelect) {
-        const currentGender = v.gender || this.getStudentGender(v.student_name, v.class_name);
-        genderSelect.value = currentGender;
+      const currentGender = v.gender || this.getStudentGender(v.student_name, v.class_name);
+      if (editGender) {
+        editGender.value = currentGender;
       }
 
-      const dateInput = document.getElementById('edit-viol-date');
-      if (dateInput) {
-        dateInput.value = v.date || new Date().toISOString().split('T')[0];
+      if (editDate) {
+        editDate.value = v.date || new Date().toISOString().split('T')[0];
       }
 
-      const weekSelect = document.getElementById('edit-viol-week');
-      if (weekSelect) {
+      const w = parseInt(v.week, 10) || this.calculateWeek(v.date) || this.currentWeek || 1;
+      if (editWeek) {
         let optHtml = '';
         for (let i = 1; i <= 35; i++) {
           optHtml += `<option value="${i}" ${i === w ? 'selected' : ''}>Tuần ${String(i).padStart(2, '0')}</option>`;
         }
-        weekSelect.innerHTML = optHtml;
+        editWeek.innerHTML = optHtml;
+        editWeek.value = String(w);
       }
 
-      document.getElementById('edit-viol-category').value = v.violation_category || '';
-      document.getElementById('edit-viol-points').value = v.penalty_points !== undefined ? v.penalty_points : 0.5;
-      document.getElementById('edit-viol-note').value = v.original_note || '';
+      if (editCat) editCat.value = v.violation_category || '';
+      if (editPoints) editPoints.value = v.penalty_points !== undefined ? v.penalty_points : 0.5;
+      if (editNote) editNote.value = v.original_note || '';
 
       // Tự động nạp gợi ý danh sách học sinh và danh mục lỗi cho modal chỉnh sửa
       const stuDatalist = document.getElementById('edit-viol-students-datalist');
@@ -2141,8 +2187,17 @@ class DisciplineApp {
       }
 
       modal.classList.remove('hidden');
+      modal.style.display = 'flex';
       if (window.lucide) window.lucide.createIcons();
     });
+  }
+
+  closeEditViolationModal() {
+    const modal = document.getElementById('modal-edit-violation');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
   }
 
   handleSaveEditViolation(e) {
@@ -2182,7 +2237,7 @@ class DisciplineApp {
     v.penalty_points = newPoints;
     v.original_note = newNote;
 
-    localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+    this.saveViolations();
 
     // Đồng bộ lại Bảng thi đua cho tuần/lớp cũ
     this.syncViolationWithEmulation(oldWeek, oldClass);
@@ -2192,8 +2247,7 @@ class DisciplineApp {
       this.syncViolationWithEmulation(newWeek, newClass);
     }
 
-    const modal = document.getElementById('modal-edit-violation');
-    if (modal) modal.classList.add('hidden');
+    this.closeEditViolationModal();
 
     this.updateBadges();
     this.renderLogsTable();
@@ -2206,9 +2260,107 @@ class DisciplineApp {
     }
 
     // Tự động đồng bộ thời gian thực lên Cloud Database (Google Sheets)
-    this.pushToCloud(true);
+    this.pushToCloud(false).then(ok => {
+      if (ok) {
+        this.showToast(`✅ Đã cập nhật vi phạm và đồng bộ trực tiếp lên Google Sheets cho lớp ${newClass} Tuần ${newWeek}!`, 'success');
+      } else {
+        this.showToast(`Đã cập nhật vi phạm trên thiết bị và đồng bộ điểm thi đua của lớp ${newClass} Tuần ${newWeek}!`, 'success');
+      }
+    }).catch(() => {
+      this.showToast(`Đã cập nhật vi phạm trên thiết bị của lớp ${newClass} Tuần ${newWeek}!`, 'success');
+    });
+  }
 
-    this.showToast(`Đã cập nhật vi phạm và tự động đồng bộ lại điểm thi đua của lớp ${newClass} Tuần ${newWeek}!`, 'success');
+  showViolationTooltip(event, id) {
+    const v = this.violations.find(x => String(x.id) === String(id));
+    if (!v) return;
+
+    const popover = document.getElementById('violation-tooltip-popover');
+    if (!popover) return;
+
+    const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
+    const dateFormatted = this.formatDate(v.date);
+    const noteContent = (v.original_note && v.original_note.trim()) ? v.original_note.trim() : 'Không có ghi chú thêm.';
+
+    popover.innerHTML = `
+      <div class="flex items-start justify-between gap-3 pb-2.5 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          </div>
+          <div>
+            <div class="font-bold text-slate-900 text-xs">${v.student_name || 'Học sinh'}</div>
+            <div class="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+              <span class="font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60">Lớp ${v.class_name}</span>
+              <span>•</span>
+              <span>${gender}</span>
+              <span>•</span>
+              <span class="font-medium text-slate-600">Tuần ${v.week}</span>
+            </div>
+          </div>
+        </div>
+        <span class="bg-rose-100 text-rose-700 font-extrabold px-2 py-0.5 rounded-full text-xs shadow-xs border border-rose-200">-${v.penalty_points}đ</span>
+      </div>
+
+      <div class="py-2.5 space-y-2 text-xs">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Lỗi vi phạm</span>
+          <p class="font-bold text-slate-800 leading-snug">${v.violation_category}</p>
+        </div>
+        
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Chi tiết / Ghi chú gốc</span>
+          <div class="p-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium text-[11px] leading-relaxed break-words whitespace-pre-wrap">
+            ${noteContent}
+          </div>
+        </div>
+      </div>
+
+      <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+        <span class="flex items-center gap-1">
+          <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <span>Ngày: ${dateFormatted}</span>
+        </span>
+        <span class="text-emerald-600 font-medium flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+          <span>Google Sheets</span>
+        </span>
+      </div>
+    `;
+
+    popover.classList.remove('hidden');
+    popover.style.display = 'block';
+    this.moveViolationTooltip(event);
+  }
+
+  moveViolationTooltip(event) {
+    const popover = document.getElementById('violation-tooltip-popover');
+    if (!popover || popover.style.display === 'none') return;
+
+    const w = 340;
+    const h = 240;
+    let x = event.clientX + 16;
+    let y = event.clientY + 16;
+
+    if (x + w > window.innerWidth) {
+      x = event.clientX - w - 16;
+    }
+    if (y + h > window.innerHeight) {
+      y = event.clientY - h - 16;
+    }
+    if (x < 10) x = 10;
+    if (y < 10) y = 10;
+
+    popover.style.left = `${x}px`;
+    popover.style.top = `${y}px`;
+  }
+
+  hideViolationTooltip() {
+    const popover = document.getElementById('violation-tooltip-popover');
+    if (popover) {
+      popover.classList.add('hidden');
+      popover.style.display = 'none';
+    }
   }
 
   handleEditViolDateChange(dateVal) {
@@ -3103,19 +3255,16 @@ class DisciplineApp {
             ? `<span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nữ</span>`
             : `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nam</span>`;
           
-          let actCol = `<span class="text-slate-300 flex justify-center"><i data-lucide="lock" class="w-3.5 h-3.5"></i></span>`;
-          if (canAction) {
-            actCol = `
-              <div class="flex items-center justify-center gap-1">
-                <button type="button" onclick="window.app.openEditViolationModal('${v.id}')" class="p-1 text-slate-400 hover:text-blue-600 rounded transition cursor-pointer" title="Sửa vi phạm">
-                  <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-                </button>
-                <button type="button" onclick="window.app.deleteViolation('${v.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer" title="Xóa vi phạm">
-                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-            `;
-          }
+          const actCol = `
+            <div class="flex items-center justify-center gap-1">
+              <button type="button" onclick="window.app.openEditViolationModal('${v.id}')" class="p-1 text-slate-400 hover:text-blue-600 rounded transition cursor-pointer" title="Sửa vi phạm">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+              </button>
+              <button type="button" onclick="window.app.deleteViolation('${v.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer" title="Xóa vi phạm">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          `;
 
           return `
             <tr class="hover:bg-slate-50 border-b border-slate-100">
@@ -3126,7 +3275,15 @@ class DisciplineApp {
               <td class="p-2.5 font-bold text-slate-900">${v.student_name}</td>
               <td class="p-2.5 text-center">${genderBadge}</td>
               <td class="p-2.5 text-center text-slate-600 text-xs">${this.formatDate(v.date)}</td>
-              <td class="p-2.5 text-slate-800 font-semibold">${v.violation_category}</td>
+              <td class="p-2.5 text-slate-800 font-semibold cursor-pointer"
+                  onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
+                  onmousemove="window.app.moveViolationTooltip(event)"
+                  onmouseleave="window.app.hideViolationTooltip()">
+                <span class="inline-flex items-center gap-1.5 hover:text-blue-600 transition group">
+                  <i data-lucide="info" class="w-3 h-3 text-blue-500 opacity-60 group-hover:opacity-100"></i>
+                  <span class="group-hover:underline underline-offset-2">${v.violation_category}</span>
+                </span>
+              </td>
               <td class="p-2.5 text-center font-bold text-red-600">-${v.penalty_points}đ</td>
               <td class="p-2.5 text-center">${actCol}</td>
             </tr>
@@ -5141,30 +5298,83 @@ class DisciplineApp {
     }
   }
 
+  // ==================== DỌN DẸP CACHE & BỘ NHỚ ĐỆM CŨ ====================
+
+  purgeObsoleteCache() {
+    try {
+      const CURRENT_STORAGE_VER = '2.3.0_GAS_STANDARD';
+      if (typeof localStorage === 'undefined') return;
+
+      const savedVer = localStorage.getItem('dshs_storage_version');
+
+      // 1. Quét và loại bỏ triệt để bất kỳ key nào chứa kvdb.io trong localStorage
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          const val = localStorage.getItem(key);
+          if (typeof val === 'string' && val.includes('kvdb.io')) {
+            keysToRemove.push(key);
+          }
+        }
+      }
+      keysToRemove.forEach(k => {
+        console.log('🧹 Purging obsolete kvdb.io cache key:', k);
+        localStorage.removeItem(k);
+      });
+
+      // 2. Nếu key dshs_cloud_url chứa kvdb.io hoặc link không hợp lệ -> xóa ngay
+      const cloudUrl = localStorage.getItem('dshs_cloud_url');
+      if (cloudUrl && (cloudUrl.includes('kvdb.io') || !cloudUrl.includes('script.google.com'))) {
+        console.log('🧹 Purging invalid dshs_cloud_url:', cloudUrl);
+        localStorage.removeItem('dshs_cloud_url');
+      }
+
+      // 3. Nếu phiên bản lưu trữ chưa được nâng cấp lên 2.3.0_GAS_STANDARD:
+      // Buộc xóa sạch dshs_cloud_url cũ để ép dùng Endpoint chuẩn
+      if (savedVer !== CURRENT_STORAGE_VER) {
+        console.log('🔄 Nâng cấp bộ nhớ đệm hệ thống lên phiên bản:', CURRENT_STORAGE_VER);
+        localStorage.removeItem('dshs_cloud_url');
+        localStorage.removeItem('dshs_cloud_url_updated_at');
+        localStorage.setItem('dshs_storage_version', CURRENT_STORAGE_VER);
+      }
+    } catch (err) {
+      console.warn('Lỗi khi dọn dẹp cache:', err);
+    }
+  }
+
   // ==================== CƠ SỞ DỮ LIỆU ĐÁM MÂY (GOOGLE SHEETS CLOUD DATABASE) ====================
 
   get DEFAULT_CLOUD_URL() {
-    // Định cứng (hardcode) đường dẫn Google Apps Script Endpoint chuẩn của nhà trường
-    return 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec';
+    // Đóng cứng (hardcode) tuyệt đối Endpoint Google Apps Script chuẩn của nhà trường
+    return OFFICIAL_GAS_ENDPOINT;
   }
 
   getCloudUrl() {
-    // 1. Nếu là Admin và Admin đã chủ động cấu hình link tùy chỉnh khác trong Cài đặt
-    if (this.isAdmin()) {
-      const customUrl = localStorage.getItem('dshs_cloud_url');
-      if (customUrl && customUrl.trim().includes('script.google.com') && !customUrl.includes('kvdb.io')) {
-        return customUrl.trim();
+    // 1. Kiểm tra cache tùy chỉnh trong localStorage
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const customUrl = localStorage.getItem('dshs_cloud_url');
+        if (customUrl) {
+          // Nếu dính kvdb.io hoặc không phải script.google.com -> lập tức xóa bỏ
+          if (customUrl.includes('kvdb.io') || !customUrl.includes('script.google.com')) {
+            localStorage.removeItem('dshs_cloud_url');
+          } else if (this.isAdmin()) {
+            // Chỉ tài khoản Admin cấp cao mới được phép dùng URL tùy chỉnh hợp lệ
+            return customUrl.trim();
+          }
+        }
       }
-    }
+    } catch (e) {}
 
     // 2. Mặc định trên toàn bộ thiết bị (Điện thoại, Máy tính bảng, Máy tính - Khách xem, Giám thị lhp38, Admin 2806):
-    // Luôn luôn tự động dùng đường dẫn chuẩn định cứng trong mã nguồn mà không cần dán thủ công
+    // Luôn luôn tự động dùng đường dẫn chuẩn định cứng trong mã nguồn mà không bị kẹt link cũ
     return this.DEFAULT_CLOUD_URL;
   }
 
-  async setCloudUrl(url, broadcast = true) {
+  async setCloudUrl(url, broadcast = false) {
     const cleanUrl = (url && url.trim()) ? url.trim() : this.DEFAULT_CLOUD_URL;
-    if (cleanUrl !== this.DEFAULT_CLOUD_URL) {
+    if (cleanUrl !== this.DEFAULT_CLOUD_URL && cleanUrl.includes('script.google.com') && !cleanUrl.includes('kvdb.io')) {
       localStorage.setItem('dshs_cloud_url', cleanUrl);
     } else {
       localStorage.removeItem('dshs_cloud_url');
@@ -5176,92 +5386,41 @@ class DisciplineApp {
     if (inputCloudUrl) {
       inputCloudUrl.value = this.getCloudUrl();
     }
-
-    // Nếu Admin cập nhật link Endpoint và có cờ broadcast:
-    // Tự động phát tán link mới lên Cloud Registry để điện thoại và các thiết bị khác tự động nhận diện và cập nhật ngay lập tức!
-    if (broadcast && (this.isAdmin() || this.isSupervisor())) {
-      await this.broadcastEndpointToCloud(cleanUrl);
-    }
   }
 
   /**
-   * Phát tán đường dẫn Google Apps Script mới lên Cloud Registry toàn hệ thống
+   * Đồng bộ / ghi nhận đường dẫn Google Apps Script chuẩn
    */
   async broadcastEndpointToCloud(newUrl) {
-    try {
-      const registryUrl = (window.GLOBAL_CONFIG && window.GLOBAL_CONFIG.REGISTRY_URL)
-        ? window.GLOBAL_CONFIG.REGISTRY_URL
-        : 'https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/gas_endpoint_registry';
-
-      const payload = {
-        url: newUrl,
-        updated_at: Date.now(),
-        updated_by: this.isAdmin() ? 'admin' : 'supervisor'
-      };
-
-      await fetch(registryUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      console.log('✅ Đã phát tán link Google Apps Script mới lên Cloud Registry:', newUrl);
-    } catch (err) {
-      console.warn('Lỗi khi phát tán Endpoint lên Registry:', err);
-    }
+    console.log('✅ Google Apps Script Endpoint chuẩn:', newUrl || this.getCloudUrl());
   }
 
   /**
-   * Tự động kiểm tra và đồng bộ Endpoint mới nhất từ Cloud / config.json cho các thiết bị khác (điện thoại, máy tính bảng)
+   * Tự động kiểm tra và đồng bộ Endpoint mới nhất từ config.json cho các thiết bị khác (điện thoại, máy tính bảng)
    */
   async syncGlobalEndpoint() {
     try {
       const now = Date.now();
       let latestUrl = null;
-      let latestTime = 0;
 
-      // 1. Thử lấy từ Cloud Registry (nơi Admin vừa phát tán link mới nhất)
+      // 1. Kiểm tra config.json trên server
       try {
-        const registryUrl = (window.GLOBAL_CONFIG && window.GLOBAL_CONFIG.REGISTRY_URL)
-          ? `${window.GLOBAL_CONFIG.REGISTRY_URL}?_t=${now}`
-          : `https://kvdb.io/UiyqhMqb9xKt19ZniuwjeH/gas_endpoint_registry?_t=${now}`;
-
-        const regRes = await fetch(registryUrl, { cache: 'no-cache' });
-        if (regRes.ok) {
-          const regData = await regRes.json();
-          if (regData && regData.url && regData.url.includes('script.google.com')) {
-            latestUrl = regData.url.trim();
-            latestTime = regData.updated_at || now;
+        const cfgRes = await fetch(`config.json?_t=${now}`, { cache: 'no-cache' });
+        if (cfgRes.ok) {
+          const cfgData = await cfgRes.json();
+          if (cfgData && cfgData.gas_endpoint && cfgData.gas_endpoint.includes('script.google.com') && !cfgData.gas_endpoint.includes('kvdb.io')) {
+            latestUrl = cfgData.gas_endpoint.trim();
           }
         }
-      } catch (e) {
-        // Tiếp tục thử config.json nếu registry bận
-      }
+      } catch (e) {}
 
-      // 2. Thử lấy từ config.json trên server nếu Registry chưa có
-      if (!latestUrl) {
-        try {
-          const cfgRes = await fetch(`config.json?_t=${now}`, { cache: 'no-cache' });
-          if (cfgRes.ok) {
-            const cfgData = await cfgRes.json();
-            if (cfgData && cfgData.gas_endpoint && cfgData.gas_endpoint.includes('script.google.com')) {
-              latestUrl = cfgData.gas_endpoint.trim();
-              latestTime = cfgData.updated_at || now;
-            }
-          }
-        } catch (e) {}
-      }
-
-      // 3. Nếu tìm thấy Endpoint hợp lệ và khác với Endpoint hiện tại trên thiết bị này:
+      // 2. Nếu tìm thấy Endpoint hợp lệ trong config.json và khác với Endpoint hiện tại trên thiết bị này:
       if (latestUrl && latestUrl !== this.getCloudUrl()) {
-        const currentLocalTime = parseInt(localStorage.getItem('dshs_cloud_url_updated_at') || '0', 10);
-
-        // Với máy khách (điện thoại, máy tính bảng) hoặc khi link trên Cloud mới hơn:
-        // Tự động nhận diện và cập nhật ngay theo link mới này mà không bị kẹt ở link cũ!
-        if (!this.isAdmin() || latestTime > currentLocalTime) {
-          console.log(`🔄 Tự động cập nhật Endpoint Google Apps Script mới: ${latestUrl}`);
+        if (!this.isAdmin()) {
+          console.log(`🔄 Tự động cập nhật Endpoint Google Apps Script mới từ config: ${latestUrl}`);
           await this.setCloudUrl(latestUrl, false);
           this.updateCloudStatusBadge(true);
-          return true; // Đã cập nhật Endpoint mới
+          return true;
         }
       }
     } catch (err) {
