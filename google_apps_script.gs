@@ -139,27 +139,32 @@ function doPost(e) {
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
 
-    // Đồng bộ danh sách deleted_ids và lọc bỏ triệt để các ID đã xóa
-    var deletedIds = payload.deleted_ids || [];
-    if (payload.deleted_id && deletedIds.indexOf(String(payload.deleted_id)) === -1) {
-      deletedIds.push(String(payload.deleted_id));
+    // Chỉ cập nhật trang Nhật Ký Vi Phạm nếu có gửi kèm mảng violations hợp lệ
+    var violationsCount = 0;
+    if (Array.isArray(payload.violations)) {
+      // Đồng bộ danh sách deleted_ids và lọc bỏ triệt để các ID đã xóa
+      var deletedIds = payload.deleted_ids || [];
+      if (payload.deleted_id && deletedIds.indexOf(String(payload.deleted_id)) === -1) {
+        deletedIds.push(String(payload.deleted_id));
+      }
+      payload.deleted_ids = deletedIds;
+
+      var delMap = {};
+      for (var d = 0; d < deletedIds.length; d++) {
+        delMap[String(deletedIds[d])] = true;
+      }
+      var violations = payload.violations.filter(function(v) {
+        return v && v.id && !delMap[String(v.id)];
+      });
+      payload.violations = violations;
+      violationsCount = violations.length;
+
+      // 1. Lưu trữ bản sao dữ liệu toàn vẹn (Full State) vào sheet HeThong_Data
+      saveRawData(ss, JSON.stringify(payload));
+
+      // 2. Cập nhật trang Nhật Ký Vi Phạm (NhatKyViPham)
+      updateViolationsSheet(ss, violations);
     }
-    payload.deleted_ids = deletedIds;
-
-    var delMap = {};
-    for (var d = 0; d < deletedIds.length; d++) {
-      delMap[String(deletedIds[d])] = true;
-    }
-    var violations = (payload.violations || []).filter(function(v) {
-      return v && v.id && !delMap[String(v.id)];
-    });
-    payload.violations = violations;
-
-    // 1. Lưu trữ bản sao dữ liệu toàn vẹn (Full State) vào sheet HeThong_Data
-    saveRawData(ss, JSON.stringify(payload));
-
-    // 2. Cập nhật trang Nhật Ký Vi Phạm (NhatKyViPham)
-    updateViolationsSheet(ss, violations);
 
     // 3. Cập nhật trang Bảng Tổng Hợp Thi Đua (BangTongHopThiDua)
     if (payload.emulation_weeks) {
@@ -168,9 +173,8 @@ function doPost(e) {
 
     return createJsonResponse({
       status: 'success',
-      message: 'Đã đồng bộ an toàn ' + violations.length + ' bản ghi vi phạm lên Google Sheets!',
-      count: violations.length,
-      deleted_count: deletedIds.length,
+      message: 'Đã xử lý an toàn ' + violationsCount + ' bản ghi vi phạm trên Google Sheets!',
+      count: violationsCount,
       updated_at: Date.now()
     });
 

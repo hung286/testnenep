@@ -5589,9 +5589,7 @@ class DisciplineApp {
     try {
       let method = 'POST';
       let headers = {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
+        'Content-Type': 'application/json'
       };
       const isGAS = cloudUrl.includes('script.google.com');
 
@@ -5599,12 +5597,11 @@ class DisciplineApp {
         method = 'PUT';
       }
 
-      // Với Google Apps Script Web App, BẮT BUỘC dùng Content-Type: text/plain;charset=utf-8 để tránh CORS preflight OPTIONS
+      // Với Google Apps Script Web App, BẮT BUỘC dùng Content-Type: text/plain;charset=utf-8 thuần túy (Mô hình kvdb.io)
+      // Tuyệt đối KHÔNG gửi kèm Cache-Control/Pragma để tránh lỗi trình duyệt gửi OPTIONS CORS preflight
       if (isGAS) {
         headers = {
-          'Content-Type': 'text/plain;charset=utf-8',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
+          'Content-Type': 'text/plain;charset=utf-8'
         };
       }
 
@@ -5619,25 +5616,32 @@ class DisciplineApp {
         ...extraPayload
       };
 
-      // Cache-Busting URL cực mạnh
+      // Cache-Busting URL cực mạnh bằng query parameter (Chống cache di động tuyệt đối)
       const sep = cloudUrl.includes('?') ? '&' : '?';
       const cacheBustUrl = `${cloudUrl}${sep}_t=${Date.now()}&_rnd=${Math.random().toString(36).substring(2, 9)}`;
 
       const res = await fetch(cacheBustUrl, {
         method: method,
         mode: 'cors',
-        cache: 'no-store',
+        redirect: 'follow',
         headers: headers,
         body: JSON.stringify(payload)
       });
 
       if (res.ok) {
+        let respData = null;
+        try {
+          const respText = await res.text();
+          respData = JSON.parse(respText);
+        } catch (e) {}
+
         localStorage.setItem('dshs_last_sync_time', new Date().toISOString());
         localStorage.setItem('dshs_last_push_time', new Date().toISOString());
         this.updateCloudStatusBadge(true);
         if (!silent) {
           const targetName = isGAS ? 'Google Sheets' : 'Cloud';
-          this.showToast(`Đã đồng bộ an toàn ${this.violations.length} bản ghi vi phạm lên ${targetName}!`, 'success');
+          const count = (respData && typeof respData.count === 'number') ? respData.count : this.violations.length;
+          this.showToast(`Đã đồng bộ an toàn ${count} bản ghi vi phạm lên ${targetName}!`, 'success');
         }
         return true;
       } else {
@@ -5647,7 +5651,9 @@ class DisciplineApp {
       }
     } catch (err) {
       console.warn('Không thể gửi dữ liệu lên Cloud Database:', err);
-      this.updateCloudStatusBadge(false);
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        this.updateCloudStatusBadge(false);
+      }
       return false;
     }
   }
@@ -5665,31 +5671,39 @@ class DisciplineApp {
 
     try {
       const sep = cloudUrl.includes('?') ? '&' : '?';
-      // Cache-Busting URL cực mạnh: Luôn lấy dữ liệu mới nhất trực tiếp từ Google Sheets, chống cache di động
+      // Cache-Busting URL cực mạnh (mô hình kvdb.io): URL query param tự động ép trình duyệt luôn lấy dữ liệu mới nhất
       const fetchUrl = `${cloudUrl}${sep}action=get&_t=${now}&_rnd=${Math.random().toString(36).substring(2, 9)}`;
 
+      // GET request gọn nhẹ chuẩn Simple CORS: KHÔNG gửi kèm custom header Cache-Control/Pragma để tránh lỗi OPTIONS CORS
       const res = await fetch(fetchUrl, {
         method: 'GET',
         mode: 'cors',
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
+        redirect: 'follow'
       });
 
       if (!res.ok) {
+        console.warn('Lỗi kết nối máy chủ Google Sheets HTTP', res.status);
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          this.updateCloudStatusBadge(false);
+        }
         return false;
       }
 
-      let jsonResp = await res.json();
-      let data = jsonResp;
-
-      // Chuẩn hóa phản hồi từ Google Apps Script Web App: { status: 'success', data: { ... } }
-      if (jsonResp && jsonResp.data && (Array.isArray(jsonResp.data.violations) || typeof jsonResp.data === 'object')) {
-        data = jsonResp.data;
+      let respText = await res.text();
+      let jsonResp = null;
+      try {
+        jsonResp = JSON.parse(respText);
+      } catch (parseErr) {
+        console.warn('Phản hồi từ Google Sheets không phải định dạng JSON:', respText.slice(0, 150));
+        return false;
       }
+
+      if (jsonResp && jsonResp.status === 'error') {
+        console.warn('Google Sheets báo lỗi:', jsonResp.message);
+        return false;
+      }
+
+      let data = (jsonResp && jsonResp.data) ? jsonResp.data : jsonResp;
 
       let cloudViolations = null;
       let cloudDeletedIds = [];
@@ -5733,26 +5747,34 @@ class DisciplineApp {
         // Lọc bỏ bất kỳ ID nào thuộc danh sách đã xóa
         const sanitizedCloudList = cloudViolations.filter(v => v && v.id && !this.deletedViolationIds.has(String(v.id)));
 
-        // Kiểm tra xem có bản ghi nào bị xóa trên Cloud mà local vẫn còn lưu không:
-        const currentLocalIds = new Set(this.violations.map(v => String(v.id)));
-        const cloudIds = new Set(sanitizedCloudList.map(v => String(v.id)));
-
-        let hasDeletedDiff = false;
-        for (const localId of currentLocalIds) {
-          if (!cloudIds.has(localId)) {
-            hasDeletedDiff = true;
-            this.trackDeletedViolationId(localId);
-            break;
+        // Safeguard: Nếu cloud rỗng (0 bản ghi) nhưng local có dữ liệu và chưa từng có lệnh xóa
+        if (sanitizedCloudList.length === 0 && this.violations.length > 0 && (!cloudDeletedIds || cloudDeletedIds.length === 0) && (!this.deletedViolationIds || this.deletedViolationIds.size === 0)) {
+          console.warn('Phát hiện Cloud rỗng chưa khởi tạo dữ liệu, giữ an toàn dữ liệu máy và đồng bộ lên Cloud');
+          if (this.isAdmin() || this.isSupervisor()) {
+            this.pushToCloud(true);
           }
-        }
+        } else {
+          // Kiểm tra xem có bản ghi nào bị xóa trên Cloud mà local vẫn còn lưu không:
+          const currentLocalIds = new Set(this.violations.map(v => String(v.id)));
+          const cloudIds = new Set(sanitizedCloudList.map(v => String(v.id)));
 
-        if (hasDeletedDiff || sanitizedCloudList.length !== this.violations.length || JSON.stringify(this.violations) !== JSON.stringify(sanitizedCloudList)) {
-          dataChanged = true;
-        }
+          let hasDeletedDiff = false;
+          for (const localId of currentLocalIds) {
+            if (!cloudIds.has(localId)) {
+              hasDeletedDiff = true;
+              this.trackDeletedViolationId(localId);
+              break;
+            }
+          }
 
-        // Cập nhật danh sách vi phạm chuẩn hóa từ Cloud
-        this.violations = this.sortViolations(sanitizedCloudList);
-        localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+          if (hasDeletedDiff || sanitizedCloudList.length !== this.violations.length || JSON.stringify(this.violations) !== JSON.stringify(sanitizedCloudList)) {
+            dataChanged = true;
+          }
+
+          // Cập nhật danh sách vi phạm chuẩn hóa từ Cloud
+          this.violations = this.sortViolations(sanitizedCloudList);
+          localStorage.setItem('dshs_violations', JSON.stringify(this.violations));
+        }
       }
 
       // 3. Cập nhật Bảng thi đua nếu có từ Cloud
@@ -5793,7 +5815,9 @@ class DisciplineApp {
       return true;
     } catch (err) {
       console.warn('Lỗi khi tải dữ liệu từ Cloud Database:', err);
-      this.updateCloudStatusBadge(false);
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        this.updateCloudStatusBadge(false);
+      }
       return false;
     }
   }
@@ -5851,14 +5875,18 @@ class DisciplineApp {
     this.showToast(`Đang kiểm tra kết nối ${cloudName}...`, 'info');
 
     try {
+      const sep = url.includes('?') ? '&' : '?';
       const testUrl = isGAS
-        ? (url.includes('?') ? `${url}&action=ping&t=${Date.now()}` : `${url}?action=ping&t=${Date.now()}`)
-        : (url.includes('?') ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`);
+        ? `${url}${sep}action=ping&_t=${Date.now()}`
+        : `${url}${sep}_t=${Date.now()}`;
 
-      const res = await fetch(testUrl, { method: 'GET', mode: 'cors', cache: 'no-cache' });
+      const res = await fetch(testUrl, { method: 'GET', mode: 'cors', redirect: 'follow' });
       if (res.ok) {
         let respData = null;
-        try { respData = await res.json(); } catch(e){}
+        try {
+          const text = await res.text();
+          respData = JSON.parse(text);
+        } catch(e) {}
 
         await this.setCloudUrl(url, true);
         this.updateCloudStatusBadge(true);
