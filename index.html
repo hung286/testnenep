@@ -97,6 +97,15 @@
           <span>Sao Lưu & Bảo Vệ</span>
         </button>
 
+        <!-- Settings Button (Protected by Admin Password 2806) -->
+        <button id="btn-header-settings" title="Cài đặt hệ thống & Google Sheets (Yêu cầu mật khẩu Admin 2806)"
+                type="button"
+                onclick="window.app && window.app.openSettingsModal()"
+                class="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl transition shadow-xs cursor-pointer min-h-[44px]">
+          <i data-lucide="settings" class="w-4 h-4 text-slate-600"></i>
+          <span class="hidden sm:inline">Cài Đặt</span>
+        </button>
+
         <!-- Lock / Unlock Status Button for Data Entry -->
         <button id="btn-toggle-auth-lock" 
                 type="button"

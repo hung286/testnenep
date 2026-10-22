@@ -4672,9 +4672,16 @@ class DisciplineApp {
   }
 
   openSettingsModal() {
+    // Yêu cầu xác thực quyền Admin cấp cao (2806) trước khi mở Cài đặt / cấu hình Cloud
+    this.requireAdmin(() => {
+      this._openSettingsModalDirect();
+    });
+  }
+
+  _openSettingsModalDirect() {
     const modal = document.getElementById('modal-settings');
     const inputKey = document.getElementById('input-api-key');
-    inputKey.value = window.geminiService.getApiKey();
+    if (inputKey) inputKey.value = window.geminiService.getApiKey();
 
     const currentModel = window.geminiService.getSelectedModel();
     this.selectModelCard(currentModel);
@@ -4685,8 +4692,10 @@ class DisciplineApp {
     }
     this.updateCloudStatusBadge(true);
 
-    modal.classList.remove('hidden');
-    inputKey.focus();
+    if (modal) {
+      modal.classList.remove('hidden');
+      if (inputKey) inputKey.focus();
+    }
   }
 
   selectModelCard(modelId) {
@@ -5135,29 +5144,37 @@ class DisciplineApp {
   // ==================== CƠ SỞ DỮ LIỆU ĐÁM MÂY (GOOGLE SHEETS CLOUD DATABASE) ====================
 
   get DEFAULT_CLOUD_URL() {
-    return (window.GLOBAL_CONFIG && window.GLOBAL_CONFIG.DEFAULT_GAS_ENDPOINT)
-      ? window.GLOBAL_CONFIG.DEFAULT_GAS_ENDPOINT
-      : 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec';
+    // Định cứng (hardcode) đường dẫn Google Apps Script Endpoint chuẩn của nhà trường
+    return 'https://script.google.com/macros/s/AKfycbwQxI054Rt_-t8oVCUcAQ4F-DHTklMfv7JPyrS-pKTkqV2vtW4zPCup0UXFAIyDxNXZvQ/exec';
   }
 
   getCloudUrl() {
-    const saved = localStorage.getItem('dshs_cloud_url');
-    // Nếu link trong localStorage trống, là link cũ kvdb, hoặc không phải link script.google.com: tự động fallback về link chính thức
-    if (!saved || saved.includes('kvdb.io') || !saved.includes('script.google.com')) {
-      return this.DEFAULT_CLOUD_URL;
+    // 1. Nếu là Admin và Admin đã chủ động cấu hình link tùy chỉnh khác trong Cài đặt
+    if (this.isAdmin()) {
+      const customUrl = localStorage.getItem('dshs_cloud_url');
+      if (customUrl && customUrl.trim().includes('script.google.com') && !customUrl.includes('kvdb.io')) {
+        return customUrl.trim();
+      }
     }
-    return saved.trim();
+
+    // 2. Mặc định trên toàn bộ thiết bị (Điện thoại, Máy tính bảng, Máy tính - Khách xem, Giám thị lhp38, Admin 2806):
+    // Luôn luôn tự động dùng đường dẫn chuẩn định cứng trong mã nguồn mà không cần dán thủ công
+    return this.DEFAULT_CLOUD_URL;
   }
 
   async setCloudUrl(url, broadcast = true) {
     const cleanUrl = (url && url.trim()) ? url.trim() : this.DEFAULT_CLOUD_URL;
-    localStorage.setItem('dshs_cloud_url', cleanUrl);
+    if (cleanUrl !== this.DEFAULT_CLOUD_URL) {
+      localStorage.setItem('dshs_cloud_url', cleanUrl);
+    } else {
+      localStorage.removeItem('dshs_cloud_url');
+    }
     localStorage.setItem('dshs_cloud_url_updated_at', String(Date.now()));
 
     // Cập nhật giá trị hiển thị trên ô input Cài đặt nếu có trong DOM
     const inputCloudUrl = document.getElementById('input-cloud-url');
     if (inputCloudUrl) {
-      inputCloudUrl.value = cleanUrl;
+      inputCloudUrl.value = this.getCloudUrl();
     }
 
     // Nếu Admin cập nhật link Endpoint và có cờ broadcast:
