@@ -21,25 +21,32 @@ if (!localStorage.getItem('gemini_api_key') || localStorage.getItem('gemini_api_
 
 const GEMINI_MODELS = [
   {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
+    id: 'gemini-3-flash-preview',
+    name: 'Gemini 3 Flash Preview',
     badge: 'Mặc định (Tốc độ & Ổn định)',
     desc: 'Tốc độ cực nhanh, hỗ trợ cả văn bản & ảnh chữ viết tay, quota dồi dào, kháng lỗi 429 vượt trội.',
     badgeColor: 'bg-emerald-100 text-emerald-700 border-emerald-300'
   },
   {
-    id: 'gemini-3-flash-preview',
-    name: 'Gemini 3 Flash Preview',
+    id: 'gemini-3.1-pro-preview',
+    name: 'Gemini 3.1 Pro Preview',
+    badge: 'Chính xác chuyên sâu',
+    desc: 'Khả năng suy luận ngữ cảnh sâu sắc, bóc tách chính xác chữ viết tay khó đọc (thay thế gemini-3-pro-preview).',
+    badgeColor: 'bg-purple-100 text-purple-700 border-purple-300'
+  },
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
     badge: 'Thế hệ mới tốc độ cao',
-    desc: 'Tối ưu cho chuẩn hóa ngôn ngữ tự nhiên và phân tích vi phạm.',
+    desc: 'Phiên bản Flash mới nhất từ Google AI, ổn định và tối ưu cho xử lý dữ liệu lớn.',
     badgeColor: 'bg-blue-100 text-blue-700 border-blue-300'
   },
   {
-    id: 'gemini-3-pro-preview',
-    name: 'Gemini 3 Pro Preview',
-    badge: 'Chính xác chuyên sâu',
-    desc: 'Khả năng suy luận ngữ cảnh sâu sắc, bóc tách chính xác chữ viết tay khó đọc.',
-    badgeColor: 'bg-purple-100 text-purple-700 border-purple-300'
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    badge: 'Tương thích ngược',
+    desc: 'Dự phòng tương thích ngược cho các tài khoản hỗ trợ.',
+    badgeColor: 'bg-slate-100 text-slate-700 border-slate-300'
   }
 ];
 
@@ -51,7 +58,7 @@ class GeminiService {
       localStorage.setItem('gemini_api_key', key);
     }
     this.apiKey = key;
-    this.selectedModel = localStorage.getItem('gemini_selected_model') || 'gemini-2.5-flash';
+    this.selectedModel = this.getSelectedModel();
     this.models = GEMINI_MODELS;
   }
 
@@ -70,19 +77,35 @@ class GeminiService {
   }
 
   getSelectedModel() {
-    return localStorage.getItem('gemini_selected_model') || 'gemini-2.5-flash';
+    let model = localStorage.getItem('gemini_selected_model') || 'gemini-3-flash-preview';
+    // Tự động nâng cấp model cũ bị 404 hoặc không tương thích
+    if (model === 'gemini-3-pro-preview') {
+      model = 'gemini-3.1-pro-preview';
+      localStorage.setItem('gemini_selected_model', model);
+    } else if (model === 'gemini-2.5-flash') {
+      model = 'gemini-3-flash-preview';
+      localStorage.setItem('gemini_selected_model', model);
+    }
+    return model;
   }
 
   setSelectedModel(modelId) {
+    if (modelId === 'gemini-3-pro-preview') {
+      modelId = 'gemini-3.1-pro-preview';
+    }
     this.selectedModel = modelId;
     localStorage.setItem('gemini_selected_model', modelId);
   }
 
   getFallbackChain(startModelId) {
+    let cleanStart = startModelId;
+    if (cleanStart === 'gemini-3-pro-preview') {
+      cleanStart = 'gemini-3.1-pro-preview';
+    }
     const list = this.models.map(m => m.id);
-    const startIdx = list.indexOf(startModelId);
+    const startIdx = list.indexOf(cleanStart);
     if (startIdx === -1) return list;
-    return [startModelId, ...list.filter(id => id !== startModelId)];
+    return [cleanStart, ...list.filter(id => id !== cleanStart)];
   }
 
   async sleep(ms) {
@@ -210,12 +233,14 @@ class GeminiService {
 
   /**
    * Gọi API Gemini với cơ chế Exponential Backoff Retry (xử lý 429 RESOURCE_EXHAUSTED & 503)
+   * Thời gian chờ tăng theo cấp số nhân: 2s -> 4s -> 8s (kèm jitter ngẫu nhiên)
    */
   async _callGeminiAPIWithRetry(apiKey, modelId, requestBody, onStatusUpdate = () => {}) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+    const retryDelays = [2000, 4000, 8000];
     const maxRetries = 3;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
       try {
         const response = await fetch(url, {
           method: 'POST',
@@ -232,18 +257,28 @@ class GeminiService {
             errorDetail = await response.text();
           }
 
+          // 1. Nếu là lỗi 404 (Model Không Tồn Tại / Đã Ngừng Hỗ Trợ): Không thử lại trên model này mà lập tức chuyển model dự phòng
+          if (response.status === 404) {
+            throw new Error(`HTTP 404: Mô hình ${modelId} không tồn tại hoặc đã ngừng hỗ trợ. Hệ thống tự động chuyển mô hình dự phòng.`);
+          }
+
+          // 2. Nếu là lỗi 429 (Rate Limit / Quá giới hạn tạm thời) hoặc 503/500 (Máy chủ bận):
           const isRateLimited = response.status === 429 || errorDetail.includes('RESOURCE_EXHAUSTED');
           const isServerBusy = response.status === 503 || response.status === 500;
 
-          if ((isRateLimited || isServerBusy) && attempt < maxRetries) {
-            const waitTimeSec = Math.min(6, 1.5 * Math.pow(2, attempt - 1));
+          if ((isRateLimited || isServerBusy) && attempt <= maxRetries) {
+            const baseDelay = retryDelays[attempt - 1] || 8000;
+            const jitter = Math.floor(Math.random() * 300);
+            const actualDelay = baseDelay + jitter;
+            const waitTimeSec = Math.round(actualDelay / 1000);
+
             onStatusUpdate({
               type: 'retry',
-              message: `Đạt giới hạn tạm thời (${response.status}). Đang tự động thử lại sau ${waitTimeSec} giây (Lần ${attempt}/${maxRetries})...`,
+              message: `Đạt giới hạn tạm thời (${response.status} / Quá tải). Hệ thống tự động chờ ${waitTimeSec} giây để thử lại (Lần ${attempt}/${maxRetries})...`,
               waitTime: waitTimeSec,
               model: modelId
             });
-            await this.sleep(waitTimeSec * 1000);
+            await this.sleep(actualDelay);
             continue;
           }
 
@@ -260,10 +295,14 @@ class GeminiService {
         return this._extractJSON(rawText);
 
       } catch (err) {
-        if (attempt >= maxRetries) {
+        // Nếu đã hết số lần thử hoặc gặp 404, lập tức quăng lỗi ra ngoài để callWithFallback chuyển sang model tiếp theo
+        if (attempt > maxRetries || (err.message && err.message.includes('404'))) {
           throw err;
         }
-        await this.sleep(1200);
+        // Trường hợp mất kết nối mạng, áp dụng backoff tương ứng
+        const baseDelay = retryDelays[attempt - 1] || 8000;
+        const actualDelay = baseDelay + Math.floor(Math.random() * 300);
+        await this.sleep(actualDelay);
       }
     }
   }
@@ -306,7 +345,7 @@ class GeminiService {
         if (i > 0) {
           onStatusUpdate({
             type: 'fallback',
-            message: `Model ${fallbackChain[i - 1]} gặp quá tải. Đang tự động chuyển sang model dự phòng: ${modelId}...`,
+            message: `Mô hình ${fallbackChain[i - 1]} gặp quá tải (429) hoặc tạm dừng. Đang tự động chuyển sang mô hình dự phòng: ${modelId}...`,
             model: modelId
           });
         }
@@ -324,7 +363,7 @@ class GeminiService {
     }
 
     const rawError = lastError ? (lastError.message || String(lastError)) : 'Lỗi kết nối không xác định';
-    throw new Error(`Tất cả các model AI đều không phản hồi: ${rawError}`);
+    throw new Error(`Tất cả các mô hình AI dự phòng đều gặp sự cố hoặc quá hạn ngạch: ${rawError}`);
   }
 
   _extractJSON(text) {
@@ -545,4 +584,8 @@ ${rulesSummary}
   }
 }
 
-window.geminiService = new GeminiService();
+if (typeof window !== 'undefined') {
+  window.geminiService = new GeminiService();
+} else if (typeof global !== 'undefined') {
+  global.geminiService = new GeminiService();
+}

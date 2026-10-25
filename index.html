@@ -281,7 +281,7 @@
                 <div class="flex items-center gap-2 text-xs text-slate-500">
                   <i data-lucide="cpu" class="w-4 h-4 text-slate-400"></i>
                   <span>Model AI:</span>
-                  <span id="display-current-model-tag" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">gemini-2.5-flash</span>
+                  <span id="display-current-model-tag" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">gemini-3-flash-preview</span>
                 </div>
 
                 <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -1585,30 +1585,30 @@
             </div>
 
             <!-- Card 2: Pro -->
-            <div data-model="gemini-3-pro-preview" class="model-card p-3.5 rounded-xl bg-white flex items-start gap-3">
+            <div data-model="gemini-3.1-pro-preview" class="model-card p-3.5 rounded-xl bg-white flex items-start gap-3">
               <div class="mt-0.5">
-                <input type="radio" name="radio-model" id="model-pro" value="gemini-3-pro-preview" class="accent-blue-600">
+                <input type="radio" name="radio-model" id="model-pro" value="gemini-3.1-pro-preview" class="accent-blue-600">
               </div>
               <div class="flex-1">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-900">gemini-3-pro-preview</span>
+                  <span class="text-xs font-bold text-slate-900">gemini-3.1-pro-preview</span>
                   <span class="text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-full">Chính xác cao</span>
                 </div>
-                <p class="text-[11px] text-slate-500 mt-0.5">Suy luận ngữ cảnh chuyên sâu, bóc tách tên phức tạp và trường hợp đặc biệt.</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">Suy luận ngữ cảnh chuyên sâu, bóc tách tên phức tạp và chữ viết tay sổ tay vi phạm.</p>
               </div>
             </div>
 
             <!-- Card 3: 2.5 Flash -->
-            <div data-model="gemini-2.5-flash" class="model-card p-3.5 rounded-xl bg-white flex items-start gap-3">
+            <div data-model="gemini-3.8-flash" class="model-card p-3.5 rounded-xl bg-white flex items-start gap-3">
               <div class="mt-0.5">
-                <input type="radio" name="radio-model" id="model-25" value="gemini-2.5-flash" class="accent-blue-600">
+                <input type="radio" name="radio-model" id="model-38" value="gemini-3.8-flash" class="accent-blue-600">
               </div>
               <div class="flex-1">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs font-bold text-slate-900">gemini-2.5-flash</span>
-                  <span class="text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-full">Dự phòng</span>
+                  <span class="text-xs font-bold text-slate-900">gemini-3.8-flash</span>
+                  <span class="text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 px-2 py-0.5 rounded-full">Thế hệ mới</span>
                 </div>
-                <p class="text-[11px] text-slate-500 mt-0.5">Dự phòng ổn định khi các model mới gặp sự cố hạn mức hạn ngạch.</p>
+                <p class="text-[11px] text-slate-500 mt-0.5">Phiên bản Flash mới nhất từ Google AI, hoạt động mượt mà và ổn định cao.</p>
               </div>
             </div>
 
@@ -1621,7 +1621,7 @@
               <span>Cơ chế Tự Động Fallback & Retry:</span>
             </div>
             <p class="text-[11px] text-blue-700 leading-relaxed">
-              Nếu model được chọn gặp lỗi hoặc quá tải (429 RESOURCE_EXHAUSTED), hệ thống sẽ <strong>tự động thử lại</strong> với model tiếp theo theo chuỗi mà không làm mất dữ liệu đã nhập.
+              Nếu model được chọn gặp lỗi quá tải (429 RESOURCE_EXHAUSTED), hệ thống sẽ <strong>tự động chờ theo cấp số nhân (2s - 4s - 8s)</strong> và chuyển tiếp trơn tru sang model dự phòng tiếp theo theo chuỗi mà không làm mất dữ liệu đã nhập.
             </p>
           </div>
         </div>

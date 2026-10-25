@@ -794,6 +794,11 @@ class DisciplineApp {
       const hasKey = (window.geminiService && typeof window.geminiService.getApiKey === 'function') ? !!window.geminiService.getApiKey() : true;
       keyIndicator.className = hasKey ? 'w-2 h-2 rounded-full bg-emerald-500' : 'w-2 h-2 rounded-full bg-red-500 animate-ping';
     }
+
+    const modelTag = document.getElementById('display-current-model-tag');
+    if (modelTag && window.geminiService && typeof window.geminiService.getSelectedModel === 'function') {
+      modelTag.textContent = window.geminiService.getSelectedModel();
+    }
   }
 
   checkDateLockWarning(dateStr) {
@@ -6008,10 +6013,17 @@ class DisciplineApp {
   }
 
   selectModelCard(modelId) {
+    if (modelId === 'gemini-3-pro-preview') {
+      modelId = 'gemini-3.1-pro-preview';
+    } else if (modelId === 'gemini-2.5-flash') {
+      modelId = 'gemini-3-flash-preview';
+    }
+    let matched = false;
     document.querySelectorAll('.model-card').forEach(card => {
       const isMatch = card.getAttribute('data-model') === modelId;
       const radio = card.querySelector('input[type="radio"]');
       if (isMatch) {
+        matched = true;
         card.classList.add('selected');
         if (radio) radio.checked = true;
       } else {
@@ -6019,6 +6031,15 @@ class DisciplineApp {
         if (radio) radio.checked = false;
       }
     });
+
+    if (!matched) {
+      const firstCard = document.querySelector('.model-card');
+      if (firstCard) {
+        firstCard.classList.add('selected');
+        const radio = firstCard.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+      }
+    }
   }
 
   checkApiKeyPrompt() {
