@@ -2413,6 +2413,96 @@
   <!-- ================================================================ -->
   <!-- MODAL: QUẢN LÝ KHÓA / MỞ CÁC TUẦN THI ĐUA (Admin)                   -->
   <!-- ================================================================ -->
+    <!-- ================================================================ -->
+  <!-- MODAL: XEM TRƯỚC VÀ XÁC NHẬN IMPORT FILE EXCEL THI ĐUA            -->
+  <!-- ================================================================ -->
+  <div id="modal-preview-excel-import" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col animate-scale-up">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+            <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-slate-900" id="preview-import-title">Xem Trước Dữ Liệu Import Excel Thi Đua</h3>
+            <p class="text-xs text-slate-500" id="preview-import-subtitle">Đối soát số liệu các lớp trước khi áp dụng vào hệ thống</p>
+          </div>
+        </div>
+        <button id="btn-close-preview-import-modal" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Quick Metrics Summary Bar -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
+        <div class="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3">
+          <span class="text-[11px] font-bold text-indigo-700 uppercase block">Số Lớp Nhận Diện</span>
+          <span class="text-lg font-extrabold text-indigo-950" id="preview-stat-classes">0 / 29 lớp</span>
+        </div>
+        <div class="bg-blue-50/70 border border-blue-100 rounded-xl p-3">
+          <span class="text-[11px] font-bold text-blue-700 uppercase block">Tổng Tiết Giờ Dạy</span>
+          <span class="text-lg font-extrabold text-blue-950" id="preview-stat-lessons">0 tiết</span>
+        </div>
+        <div class="bg-rose-50/70 border border-rose-100 rounded-xl p-3">
+          <span class="text-[11px] font-bold text-rose-700 uppercase block">Tổng Lượt Vắng</span>
+          <span class="text-lg font-extrabold text-rose-950" id="preview-stat-absences">0 lượt</span>
+        </div>
+        <div class="bg-amber-50/70 border border-amber-100 rounded-xl p-3">
+          <span class="text-[11px] font-bold text-amber-700 uppercase block">Điểm Thưởng / Cộng</span>
+          <span class="text-lg font-extrabold text-amber-950" id="preview-stat-bonus">0 lớp có điểm cộng</span>
+        </div>
+      </div>
+
+      <!-- Scrollable Preview Table -->
+      <div class="overflow-x-auto flex-1 border border-slate-200 rounded-xl max-h-[46vh]">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="sticky top-0 bg-slate-100 z-10 border-b border-slate-200 font-bold text-slate-700">
+            <tr>
+              <th class="p-2 text-center w-10">TT</th>
+              <th class="p-2 text-center w-14">Lớp</th>
+              <th class="p-2">GVCN</th>
+              <th class="p-2 text-center w-12 bg-blue-50/80">SHL</th>
+              <th class="p-2 text-center w-10">Tốt</th>
+              <th class="p-2 text-center w-10">A</th>
+              <th class="p-2 text-center w-10">B</th>
+              <th class="p-2 text-center w-10">C</th>
+              <th class="p-2 text-center w-10">D</th>
+              <th class="p-2 text-center w-12 bg-indigo-50/80">Tổng</th>
+              <th class="p-2 text-center w-14 bg-indigo-50/80">Đ.TB</th>
+              <th class="p-2 text-center w-12 bg-rose-50/80">15'</th>
+              <th class="p-2 text-center w-12">Vắng</th>
+              <th class="p-2 text-center w-14 bg-amber-50/80">Cộng TB</th>
+              <th class="p-2 text-center w-14 bg-emerald-50/80">TB Chung</th>
+              <th class="p-2 text-center w-16 bg-emerald-50/80">Xếp Loại</th>
+            </tr>
+          </thead>
+          <tbody id="preview-import-table-body" class="divide-y divide-slate-100">
+            <!-- Dynamically populated rows -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Action Footer -->
+      <div class="flex flex-wrap items-center justify-between pt-4 mt-2 border-t border-slate-100 gap-2">
+        <div class="text-xs text-slate-500 font-medium" id="preview-import-fileinfo">
+          <!-- File info here -->
+        </div>
+        <div class="flex items-center gap-3">
+          <button type="button" id="btn-cancel-preview-import" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer">
+            Hủy Bỏ
+          </button>
+          <button type="button" id="btn-confirm-preview-import" class="px-5 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="check-circle" class="w-4 h-4"></i>
+            <span id="btn-confirm-preview-import-text">Xác Nhận Import Vào Tuần</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <div id="modal-manage-weeks" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col animate-scale-up">
       <div class="flex items-center justify-between pb-4 border-b border-slate-100">
