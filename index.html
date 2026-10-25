@@ -243,46 +243,128 @@
               <span id="locked-week-warning-text">Mốc thời gian này thuộc Tuần đã khóa. Không thể ghi nhận vi phạm cho các tuần đã khóa.</span>
             </div>
 
-            <!-- Natural Language Textarea -->
-            <div class="relative">
-              <textarea id="ai-input-text" rows="5"
-                placeholder="Ví dụ nhập liệu tự do:
+            <!-- Mode Switcher: Text/Voice vs Handwritten Image OCR -->
+            <div class="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+              <button id="btn-mode-text-input" type="button" class="ai-mode-btn active flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-50 text-blue-700 border border-blue-200 transition shadow-xs cursor-pointer">
+                <i data-lucide="file-text" class="w-4 h-4"></i>
+                <span>Nhập Văn Bản / Giọng Nói</span>
+              </button>
+              <button id="btn-mode-image-ocr" type="button" class="ai-mode-btn flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent transition cursor-pointer">
+                <i data-lucide="camera" class="w-4 h-4 text-indigo-600"></i>
+                <span>Import Ảnh Sổ Tay (OCR Chữ Viết Tay)</span>
+                <span class="text-[10px] bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-2 py-0.5 rounded-full font-bold shadow-xs">Mới</span>
+              </button>
+            </div>
+
+            <!-- CONTAINER 1: TEXT / VOICE INPUT -->
+            <div id="ai-text-input-container">
+              <!-- Natural Language Textarea -->
+              <div class="relative">
+                <textarea id="ai-input-text" rows="5"
+                  placeholder="Ví dụ nhập liệu tự do:
 - Nguyễn Bo 11A04 đi học muộn 15p, không đeo bảng tên
 - 12C08: H Ti Ra Niê mặc sai đồng phục
-- Học sinh Lê Âu Kỳ lớp 10B11 bỏ tiết sinh hoạt 15p"
-                class="w-full text-sm p-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-slate-800 placeholder:text-slate-400 placeholder:font-sans bg-slate-50/50"></textarea>
-            </div>
-
-            <!-- Quick Template Chips -->
-            <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <span class="text-slate-400 font-medium">Mẫu thử nhanh:</span>
-              <button onclick="window.app.fillSampleText(1)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Mẫu 1: 3 học sinh vi phạm</button>
-              <button onclick="window.app.fillSampleText(2)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Mẫu 2: Vi phạm giờ giấc & bảng tên</button>
-              <button onclick="window.app.fillSampleText(3)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition">Mẫu 3: Bỏ tiết sinh hoạt</button>
-            </div>
-
-            <!-- Actions Bar -->
-            <div class="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-              <div class="flex items-center gap-2 text-xs text-slate-500">
-                <i data-lucide="cpu" class="w-4 h-4 text-slate-400"></i>
-                <span>Model AI:</span>
-                <span id="display-current-model-tag" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">gemini-3-flash-preview</span>
+- Học sinh Lê Âu Kỳ lớp 10B11 ngày 19/10 và ngày 22/10 không mang áo khoác"
+                  class="w-full text-sm p-3.5 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-slate-800 placeholder:text-slate-400 placeholder:font-sans bg-slate-50/50"></textarea>
               </div>
 
-              <div class="flex items-center gap-2 w-full sm:w-auto">
-                <button id="btn-clear-ai-input" class="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition">
-                  Xóa trắng
-                </button>
-                <button id="btn-run-ai-parse" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-500/25">
-                  <i data-lucide="sparkles" class="w-4 h-4"></i>
-                  <span>Bắt Đầu Chuẩn Hóa Bằng AI</span>
+              <!-- Quick Template Chips -->
+              <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span class="text-slate-400 font-medium">Mẫu thử nhanh:</span>
+                <button onclick="window.app.fillSampleText(1)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition cursor-pointer">Mẫu 1: 3 học sinh vi phạm</button>
+                <button onclick="window.app.fillSampleText(2)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition cursor-pointer">Mẫu 2: Vi phạm giờ giấc & áo đoàn</button>
+                <button onclick="window.app.fillSampleText(3)" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition cursor-pointer">Mẫu 3: Đa ngày (19/10 & 22/10)</button>
+              </div>
+
+              <!-- Actions Bar for Text -->
+              <div class="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                  <i data-lucide="cpu" class="w-4 h-4 text-slate-400"></i>
+                  <span>Model AI:</span>
+                  <span id="display-current-model-tag" class="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">gemini-2.5-flash</span>
+                </div>
+
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                  <button id="btn-clear-ai-input" class="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition cursor-pointer">
+                    Xóa trắng
+                  </button>
+                  <button id="btn-run-ai-parse" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-blue-500/25 cursor-pointer">
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    <span>Bắt Đầu Chuẩn Hóa Bằng AI</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- CONTAINER 2: HANDWRITTEN IMAGE OCR INPUT -->
+            <div id="ai-image-ocr-container" class="hidden space-y-4">
+              <!-- Dropzone & File Pickers -->
+              <div id="ai-image-dropzone" class="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/40 hover:bg-indigo-50/70 rounded-2xl p-6 text-center transition cursor-pointer">
+                <input type="file" id="ai-input-image-file" accept="image/*" class="hidden">
+                <input type="file" id="ai-input-camera-file" accept="image/*" capture="environment" class="hidden">
+
+                <div class="flex flex-col items-center justify-center space-y-3">
+                  <div class="w-14 h-14 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center shadow-inner">
+                    <i data-lucide="camera" class="w-7 h-7"></i>
+                  </div>
+                  <div>
+                    <p class="text-sm font-bold text-slate-800">Kéo thả ảnh chụp sổ tay vào đây hoặc chọn hình ảnh</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Hỗ trợ ảnh sổ trực cờ đỏ, bảng theo dõi nề nếp viết tay (JPG, PNG, WEBP)</p>
+                  </div>
+                  <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <button type="button" id="btn-trigger-camera" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                      <i data-lucide="camera" class="w-4 h-4"></i>
+                      <span>Chụp Từ Điện Thoại</span>
+                    </button>
+                    <button type="button" id="btn-trigger-file-select" class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5 cursor-pointer">
+                      <i data-lucide="image" class="w-4 h-4"></i>
+                      <span>Chọn Ảnh Từ Máy</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Preview of Selected Image -->
+              <div id="ai-image-preview-card" class="hidden bg-slate-50 border border-indigo-200 rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <i data-lucide="file-check-2" class="w-4 h-4 text-emerald-600"></i>
+                    <span id="ai-image-name" class="font-bold text-slate-800 text-xs truncate max-w-[200px] sm:max-w-xs">so_tay_truc.jpg</span>
+                    <span id="ai-image-size" class="text-[11px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">1.2 MB</span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <button type="button" id="btn-rotate-ai-image" class="text-slate-500 hover:text-slate-800 p-1.5 rounded-lg hover:bg-white transition cursor-pointer" title="Xoay ảnh 90 độ">
+                      <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                    </button>
+                    <button type="button" id="btn-remove-ai-image" class="text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-white transition cursor-pointer" title="Xóa ảnh này">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="max-h-64 overflow-hidden rounded-xl border border-slate-200 bg-white flex items-center justify-center p-2">
+                  <img id="ai-image-preview-element" src="" alt="Sổ tay viết tay" class="max-h-60 max-w-full object-contain rounded-lg">
+                </div>
+              </div>
+
+              <!-- Actions Bar for Image -->
+              <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                  <i data-lucide="sparkles" class="w-4 h-4 text-indigo-500"></i>
+                  <span>Công nghệ:</span>
+                  <span class="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">Gemini Multimodal Vision AI</span>
+                </div>
+
+                <button id="btn-run-ai-vision" disabled class="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition shadow-md shadow-indigo-500/25 cursor-pointer">
+                  <i data-lucide="scan" class="w-4 h-4"></i>
+                  <span>Quét & Bóc Tách Chữ Viết Tay Bằng Vision AI</span>
                 </button>
               </div>
             </div>
 
           </div>
 
-          <!-- Prominent Quick Manual Entry (Optimized for Mobile & Big Touch) -->
+                    <!-- Prominent Quick Manual Entry (Optimized for Mobile & Big Touch) -->
           <div class="bg-white rounded-2xl border-2 border-blue-200/80 p-5 md:p-6 shadow-sm">
             <div class="flex items-center justify-between mb-3">
               <h4 class="font-extrabold text-slate-900 text-sm md:text-base flex items-center gap-2">
@@ -340,58 +422,75 @@
         <!-- Right Column: Live Stepper & Verification Preview (5 cols) -->
         <div class="lg:col-span-5 space-y-4">
           
-          <!-- Stepper Process State Card (as required by AI_INSTRUCTIONS) -->
+          <!-- Stepper Process State Card (4 steps upgraded) -->
           <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-xs">
-            <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider text-slate-400 mb-4 flex items-center justify-between">
+            <h3 class="font-bold text-slate-800 text-xs uppercase tracking-wider text-slate-400 mb-3 flex items-center justify-between">
               <span>Tiến trình xử lý AI</span>
               <span id="stepper-badge-status" class="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Sẵn sàng</span>
             </h3>
 
             <!-- Progress Bar -->
-            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-5">
+            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden mb-4">
               <div id="stepper-progress-bar" class="h-full bg-blue-600 w-0 transition-all duration-300"></div>
             </div>
 
-            <!-- Steps list -->
-            <div class="space-y-3">
+            <!-- Steps list (4 steps) -->
+            <div class="space-y-2.5">
               
               <!-- Step 1 -->
               <div id="step-item-1" class="step-item flex items-start gap-3">
-                <div class="step-icon w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
+                <div class="step-icon w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
                   1
                 </div>
                 <div>
                   <h4 class="text-xs font-bold text-slate-800">Bóc tách thực thể & Nhận diện</h4>
-                  <p class="text-[11px] text-slate-500">Trích xuất tên học sinh, lớp và mô tả hành vi từ đoạn văn.</p>
+                  <p class="text-[11px] text-slate-500">NLP Văn bản & Vision OCR bóc tách học sinh, lớp, lỗi từ sổ tay.</p>
                 </div>
               </div>
 
               <!-- Step 2 -->
               <div id="step-item-2" class="step-item flex items-start gap-3">
-                <div class="step-icon w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
+                <div class="step-icon w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
                   2
                 </div>
                 <div>
-                  <h4 class="text-xs font-bold text-slate-800">Đối chiếu Hồ sơ [Họ tên - Lớp]</h4>
-                  <p class="text-[11px] text-slate-500">Kiểm tra khớp với CSDL 1.226 học sinh Trường THPT Số 1 Lê Hồng Phong.</p>
+                  <h4 class="text-xs font-bold text-slate-800">Kiểm tra & Tách dòng Đa ngày</h4>
+                  <p class="text-[11px] text-slate-500">Tự động tách các vi phạm ở nhiều ngày thành từng dòng độc lập.</p>
                 </div>
               </div>
 
               <!-- Step 3 -->
               <div id="step-item-3" class="step-item flex items-start gap-3">
-                <div class="step-icon w-7 h-7 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
+                <div class="step-icon w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
                   3
                 </div>
                 <div>
-                  <h4 class="text-xs font-bold text-slate-800">Chuẩn hóa Quy chế & Tính điểm phạt</h4>
-                  <p class="text-[11px] text-slate-500">Quy đổi về 33 danh mục lỗi chuẩn và áp khung điểm trừ.</p>
+                  <h4 class="text-xs font-bold text-slate-800">Đối chiếu CSDL 1.226 học sinh (Smart Heuristics)</h4>
+                  <p class="text-[11px] text-slate-500">Fuzzy Matching, lọc lớp 10B/11A/12C, phát hiện trùng tên & cảnh báo không khớp.</p>
+                </div>
+              </div>
+
+              <!-- Step 4 -->
+              <div id="step-item-4" class="step-item flex items-start gap-3">
+                <div class="step-icon w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0">
+                  4
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-slate-800">Chuẩn hóa Quy chế & Áp điểm phạt</h4>
+                  <p class="text-[11px] text-slate-500">Quy đổi áo khoác/áo đoàn về "Sai đồng phục" (-0.5đ) và tính điểm.</p>
                 </div>
               </div>
 
             </div>
 
+            <!-- Dynamic Live Status Log Box -->
+            <div id="ai-stepper-live-log" class="hidden mt-3 p-2.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2">
+              <i data-lucide="info" class="w-4 h-4 text-blue-600 shrink-0 mt-0.5"></i>
+              <span id="ai-stepper-live-log-text">Đang khởi động tiến trình...</span>
+            </div>
+
             <!-- Fallback notification log -->
-            <div id="ai-fallback-log" class="hidden mt-4 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
+            <div id="ai-fallback-log" class="hidden mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2">
               <i data-lucide="refresh-cw" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5 animate-spin"></i>
               <span id="ai-fallback-text">Đang chuyển đổi model dự phòng...</span>
             </div>
@@ -408,13 +507,29 @@
               <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">Sẵn sàng lưu</span>
             </div>
 
+            <!-- Summary KPI Tags -->
+            <div id="preview-summary-kpis" class="flex flex-wrap items-center gap-1.5 mb-3 text-[11px]">
+              <span id="kpi-matched-count" class="bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                <i data-lucide="check" class="w-3 h-3"></i> <span id="val-kpi-matched">0</span> Khớp CSDL
+              </span>
+              <span id="kpi-unmatched-count" class="hidden bg-red-100 text-red-800 border border-red-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                <i data-lucide="alert-triangle" class="w-3 h-3"></i> <span id="val-kpi-unmatched">0</span> Không có trong CSDL
+              </span>
+              <span id="kpi-split-count" class="hidden bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                <i data-lucide="calendar" class="w-3 h-3"></i> <span id="val-kpi-split">0</span> Đã tách đa ngày
+              </span>
+              <span id="kpi-ambiguous-count" class="hidden bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-md font-bold flex items-center gap-1">
+                <i data-lucide="help-circle" class="w-3 h-3"></i> <span id="val-kpi-ambiguous">0</span> Cần chọn trùng tên
+              </span>
+            </div>
+
             <!-- Container for parsed item cards -->
-            <div id="preview-records-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+            <div id="preview-records-list" class="space-y-2.5 max-h-80 overflow-y-auto pr-1"></div>
 
             <!-- Confirm Save Button -->
             <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-              <button id="btn-cancel-preview" class="text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded">Hủy bỏ</button>
-              <button id="btn-confirm-save-violations" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5">
+              <button id="btn-cancel-preview" class="text-xs font-medium text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded cursor-pointer">Hủy bỏ</button>
+              <button id="btn-confirm-save-violations" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-1.5 cursor-pointer">
                 <i data-lucide="save" class="w-3.5 h-3.5"></i>
                 <span>Ghi Nhận Vào Nhật Ký</span>
               </button>
@@ -427,7 +542,7 @@
 
     </div>
 
-    <!-- ================================================================ -->
+        <!-- ================================================================ -->
     <!-- TAB 2: NHẬT KÝ VI PHẠM HÀNG NGÀY (Violation Logs)                -->
     <!-- ================================================================ -->
     <div id="tab-violation-logs" class="tab-content hidden space-y-4">
@@ -2310,6 +2425,53 @@
         </p>
         <button id="btn-done-manage-weeks" class="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer">
           Đóng
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- MODAL: LỰA CHỌN HỌC SINH TRÙNG TÊN / TƯƠNG ĐỒNG                    -->
+  <!-- ================================================================ -->
+  <div id="modal-resolve-ambiguous-student" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-scale-up">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
+            <i data-lucide="users" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-slate-900 text-base">Xác Nhận Học Sinh Trùng Tên</h3>
+            <p class="text-xs text-slate-500">Phát hiện nhiều học sinh tương tự trong CSDL</p>
+          </div>
+        </div>
+        <button id="btn-close-ambiguous-modal" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="mt-4 p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900">
+        <div class="font-bold flex items-center gap-1.5 mb-1">
+          <i data-lucide="alert-circle" class="w-4 h-4 text-amber-600"></i>
+          <span>Thông tin ghi chép trên sổ / văn bản:</span>
+        </div>
+        <div class="text-slate-700 ml-5">
+          Tên ghi: <strong id="ambiguous-source-name" class="text-slate-900">...</strong> — Lớp: <span id="ambiguous-source-class" class="font-bold text-blue-700">...</span>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-600 font-semibold mt-4 mb-2">Vui lòng bấm chọn đúng học sinh thực tế:</p>
+
+      <div id="ambiguous-candidates-list" class="space-y-2 max-h-60 overflow-y-auto pr-1 divide-y divide-slate-100 border border-slate-200 rounded-xl p-2 bg-slate-50/50">
+        <!-- Dynamically rendered candidate cards -->
+      </div>
+
+      <div class="pt-4 border-t border-slate-100 mt-4 flex items-center justify-between gap-2">
+        <button id="btn-keep-ambiguous-raw" class="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition cursor-pointer">
+          Giữ nguyên tên gốc (chưa khớp)
+        </button>
+        <button id="btn-cancel-ambiguous" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer">
+          Bỏ qua
         </button>
       </div>
     </div>

@@ -890,14 +890,137 @@ class DisciplineApp {
     if (sampleType === 1) {
       area.value = `- Nguyễn Bo 11A04 đi học muộn 15p, không đeo bảng tên\n- 12C08: H Ti Ra Niê mặc sai đồng phục\n- Học sinh Lê Âu Kỳ lớp 10B11 bỏ tiết sinh hoạt 15p`;
     } else if (sampleType === 2) {
-      area.value = `Sáng nay kiểm tra đầu giờ phát hiện học sinh:\n1. Nguyễn Văn Đức lớp 10B03 không có bảng tên và đi xe trong sân trường\n2. H' Surian Ayun 11A07 mặc sai đồng phục`;
+      // Mẫu quy chuẩn lỗi Áo khoác & Áo đoàn -> Sai đồng phục (-0.5đ)
+      area.value = `Ghi nhận nền nếp sáng thứ 2:\n- Bạn Vy lớp 10B01 không mang áo khoác theo quy định\n- Học sinh Huỳnh Lê Bảo An 12C08 không mặc áo đoàn\n- Em Nguyễn Bo 11A04 quên áo đoàn thứ 2`;
     } else if (sampleType === 3) {
-      area.value = `Ghi nhận vi phạm ngày hôm nay:\n- Bạn Cao Đặng Ngọc Trâm lớp 10B04 đi dép lê vào trường\n- Huỳnh Lê Bảo An 12C03 nhuộm tóc`;
+      // Mẫu kiểm tra tách dòng đa ngày vi phạm
+      area.value = `Ghi nhận tổng hợp trong tuần:\n- Nguyễn Bo 11A04 vi phạm ngày 19/10 và ngày 22/10 không mang áo khoác\n- Học sinh Lê Âu Kỳ lớp 10B11 ngày 19-10-2026 đi học muộn; ngày 22-10-2026 không có bảng tên`;
     }
   }
 
   setupEventListeners() {
-    // Nút chạy AI Parse
+    // Chuyển đổi chế độ: Nhập văn bản <-> Import ảnh sổ tay OCR
+    const btnModeText = document.getElementById('btn-mode-text-input');
+    const btnModeImage = document.getElementById('btn-mode-image-ocr');
+    const containerText = document.getElementById('ai-text-input-container');
+    const containerImage = document.getElementById('ai-image-ocr-container');
+
+    if (btnModeText && btnModeImage && containerText && containerImage) {
+      btnModeText.addEventListener('click', () => {
+        btnModeText.className = 'ai-mode-btn active flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-50 text-blue-700 border border-blue-200 transition shadow-xs cursor-pointer';
+        btnModeImage.className = 'ai-mode-btn flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent transition cursor-pointer';
+        containerText.classList.remove('hidden');
+        containerImage.classList.add('hidden');
+      });
+
+      btnModeImage.addEventListener('click', () => {
+        btnModeImage.className = 'ai-mode-btn active flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200 transition shadow-xs cursor-pointer';
+        btnModeText.className = 'ai-mode-btn flex items-center gap-2 px-3.5 py-2 text-xs font-bold rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent transition cursor-pointer';
+        containerImage.classList.remove('hidden');
+        containerText.classList.add('hidden');
+      });
+    }
+
+    // Các nút kích hoạt chọn ảnh / chụp camera
+    const btnTriggerCam = document.getElementById('btn-trigger-camera');
+    const btnTriggerFile = document.getElementById('btn-trigger-file-select');
+    const fileCam = document.getElementById('ai-input-camera-file');
+    const fileInput = document.getElementById('ai-input-image-file');
+
+    if (btnTriggerCam && fileCam) {
+      btnTriggerCam.addEventListener('click', () => fileCam.click());
+    }
+    if (btnTriggerFile && fileInput) {
+      btnTriggerFile.addEventListener('click', () => fileInput.click());
+    }
+
+    if (fileCam) {
+      fileCam.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) this.handleImageSelect(e.target.files[0]);
+      });
+    }
+    if (fileInput) {
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) this.handleImageSelect(e.target.files[0]);
+      });
+    }
+
+    // Drag and drop ảnh vào Dropzone
+    const dropzone = document.getElementById('ai-image-dropzone');
+    if (dropzone) {
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('border-indigo-500', 'bg-indigo-100/50');
+      });
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('border-indigo-500', 'bg-indigo-100/50');
+      });
+      dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('border-indigo-500', 'bg-indigo-100/50');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          this.handleImageSelect(e.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    // Hỗ trợ Paste ảnh trực tiếp từ Clipboard
+    window.addEventListener('paste', (e) => {
+      const items = (e.clipboardData || e.originalEvent?.clipboardData)?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const file = item.getAsFile();
+          if (file) {
+            if (this.activeTab === 'tab-ai-logger' && btnModeImage) {
+              btnModeImage.click();
+              this.handleImageSelect(file);
+              this.showToast('Đã dán ảnh từ clipboard!', 'info');
+            }
+          }
+        }
+      }
+    });
+
+    // Nút xóa ảnh & xoay ảnh
+    const btnRemoveImg = document.getElementById('btn-remove-ai-image');
+    if (btnRemoveImg) {
+      btnRemoveImg.addEventListener('click', () => this.clearOcrImage());
+    }
+
+    const btnRotateImg = document.getElementById('btn-rotate-ai-image');
+    if (btnRotateImg) {
+      btnRotateImg.addEventListener('click', () => this.rotateOcrImage());
+    }
+
+    // Nút chạy AI Vision
+    const btnRunVision = document.getElementById('btn-run-ai-vision');
+    if (btnRunVision) {
+      btnRunVision.addEventListener('click', () => {
+        this.requirePassword(() => this.handleRunAiVisionParse());
+      });
+    }
+
+    // Modal lựa chọn học sinh trùng tên
+    const btnCloseAmbiguous = document.getElementById('btn-close-ambiguous-modal');
+    const btnCancelAmbiguous = document.getElementById('btn-cancel-ambiguous');
+    const btnKeepAmbiguousRaw = document.getElementById('btn-keep-ambiguous-raw');
+
+    if (btnCloseAmbiguous) {
+      btnCloseAmbiguous.addEventListener('click', () => this.closeAmbiguousModal());
+    }
+    if (btnCancelAmbiguous) {
+      btnCancelAmbiguous.addEventListener('click', () => this.closeAmbiguousModal());
+    }
+    if (btnKeepAmbiguousRaw) {
+      btnKeepAmbiguousRaw.addEventListener('click', () => {
+        if (this._currentAmbiguousRecordIndex !== null) {
+          this.resolveAmbiguousKeepRaw(this._currentAmbiguousRecordIndex);
+        }
+      });
+    }
+
+    // Nút chạy AI Parse (Văn bản)
     const btnRunAi = document.getElementById('btn-run-ai-parse');
     if (btnRunAi) {
       btnRunAi.addEventListener('click', () => {
@@ -1341,6 +1464,168 @@ class DisciplineApp {
 
   // ==================== XỬ LÝ AI & QUY TRÌNH STEPPER ====================
 
+  // ── Xử lý Image Upload & Vision OCR ─────────────────────────────────────────
+
+  handleImageSelect(file) {
+    if (!file || !file.type.startsWith('image/')) {
+      this.showToast('Vui lòng chọn file hình ảnh hợp lệ (JPG, PNG, WEBP).', 'warning');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.currentOcrImageBase64 = e.target.result;
+      this.currentOcrImageMimeType = file.type || 'image/jpeg';
+      this.currentOcrImageRotation = 0;
+
+      const previewCard = document.getElementById('ai-image-preview-card');
+      const previewImg = document.getElementById('ai-image-preview-element');
+      const nameEl = document.getElementById('ai-image-name');
+      const sizeEl = document.getElementById('ai-image-size');
+      const btnRun = document.getElementById('btn-run-ai-vision');
+
+      if (previewImg) {
+        previewImg.src = this.currentOcrImageBase64;
+        previewImg.style.transform = 'rotate(0deg)';
+      }
+      if (nameEl) nameEl.textContent = file.name;
+      if (sizeEl) sizeEl.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+      if (previewCard) previewCard.classList.remove('hidden');
+      if (btnRun) btnRun.disabled = false;
+
+      this.showToast('Đã tải ảnh lên thành công. Sẵn sàng quét bằng Vision AI!', 'success');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  clearOcrImage() {
+    this.currentOcrImageBase64 = null;
+    this.currentOcrImageMimeType = null;
+    this.currentOcrImageRotation = 0;
+    const previewCard = document.getElementById('ai-image-preview-card');
+    const previewImg = document.getElementById('ai-image-preview-element');
+    const btnRun = document.getElementById('btn-run-ai-vision');
+    const fileCam = document.getElementById('ai-input-camera-file');
+    const fileInput = document.getElementById('ai-input-image-file');
+
+    if (previewCard) previewCard.classList.add('hidden');
+    if (previewImg) previewImg.src = '';
+    if (btnRun) btnRun.disabled = true;
+    if (fileCam) fileCam.value = '';
+    if (fileInput) fileInput.value = '';
+  }
+
+  rotateOcrImage() {
+    if (!this.currentOcrImageBase64) return;
+    this.currentOcrImageRotation = (this.currentOcrImageRotation + 90) % 360;
+    const previewImg = document.getElementById('ai-image-preview-element');
+    if (previewImg) {
+      previewImg.style.transform = `rotate(${this.currentOcrImageRotation}deg)`;
+    }
+  }
+
+  handleRunAiVisionParse() {
+    this.requirePassword(() => this.doRunAiVisionParse());
+  }
+
+  async doRunAiVisionParse() {
+    if (!this.currentOcrImageBase64) {
+      this.showToast('Vui lòng tải ảnh chụp sổ tay lên trước khi quét!', 'warning');
+      return;
+    }
+
+    const apiKey = window.geminiService ? window.geminiService.getApiKey() : null;
+    if (!apiKey) {
+      this.showToast('Chưa có API Key. Vui lòng cài đặt API Key để sử dụng AI.', 'warning');
+      this.openSettingsModal();
+      return;
+    }
+
+    const dateVal = document.getElementById('input-violation-date').value || new Date().toISOString().split('T')[0];
+    const weekNum = this.calculateWeek(dateVal);
+
+    if (this.isWeekLocked(weekNum)) {
+      this.showToast(`Tuần ${weekNum} đã kết thúc và được khóa dữ liệu niêm phong. Vui lòng chọn ngày thuộc Tuần 7 trở đi!`, 'error');
+      return;
+    }
+
+    document.getElementById('global-error-banner').classList.add('hidden');
+    document.getElementById('ai-fallback-log').classList.add('hidden');
+
+    const btnRun = document.getElementById('btn-run-ai-vision');
+    btnRun.disabled = true;
+    btnRun.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Đang Quét Chữ Viết Tay...</span>`;
+    if (window.lucide) window.lucide.createIcons();
+
+    try {
+      // Step 1: Multimodal Vision OCR
+      this.updateStepperState('running', 1, 'Mô hình Vision AI đang bóc tách chữ viết tay từ ảnh chụp sổ tay...');
+      await this.sleep(300);
+
+      const response = await window.geminiService.parseHandwrittenImage({
+        imageBase64: this.currentOcrImageBase64,
+        mimeType: this.currentOcrImageMimeType || 'image/jpeg',
+        inputDate: dateVal,
+        weekNum,
+        activeRules: this.rules,
+        onProgress: (status) => {
+          if (status.type === 'fallback') {
+            const fallbackLog = document.getElementById('ai-fallback-log');
+            const fallbackText = document.getElementById('ai-fallback-text');
+            if (fallbackLog && fallbackText) {
+              fallbackLog.classList.remove('hidden');
+              fallbackText.textContent = status.message;
+            }
+          } else if (status.message) {
+            this.updateStepperState('running', 1, status.message);
+          }
+        }
+      });
+
+      const rawRecords = (response.data && response.data.records) ? response.data.records : [];
+
+      // Step 2: Tách dòng Đa ngày
+      this.updateStepperState('running', 2, 'Kiểm tra và tự động tách dòng độc lập theo từng ngày vi phạm...');
+      await this.sleep(250);
+
+      // Step 3 & 4: Đối chiếu CSDL 1.226 học sinh & Chuẩn hóa quy chế
+      this.updateStepperState('running', 3, 'Đối chiếu CSDL 1.226 học sinh (Smart Heuristics)...');
+      await this.sleep(250);
+
+      this.updateStepperState('running', 4, 'Chuẩn hóa quy chế (Áo khoác/Áo đoàn -> Sai đồng phục)...');
+      await this.sleep(200);
+
+      const postProcessed = this.postProcessAiRecords(rawRecords, dateVal, weekNum);
+
+      this.updateStepperState('success', 4, `Vision AI đã bóc tách thành công ${postProcessed.records.length} bản ghi vi phạm từ ảnh!`);
+      this.renderAiPreview(postProcessed);
+
+      this.showToast(`Vision AI đã quét xong! Tìm thấy ${postProcessed.records.length} vi phạm.`, 'success');
+
+      // Tự động bật modal nếu có học sinh trùng tên
+      const firstAmbiguousIdx = postProcessed.records.findIndex(r => r.ambiguous);
+      if (firstAmbiguousIdx !== -1) {
+        setTimeout(() => this.openAmbiguousModal(firstAmbiguousIdx), 400);
+      }
+
+    } catch (err) {
+      console.error('Lỗi Vision AI:', err);
+      this.updateStepperState('error', 1, err.message);
+      const banner = document.getElementById('global-error-banner');
+      const bannerMsg = document.getElementById('global-error-message');
+      if (banner && bannerMsg) {
+        banner.classList.remove('hidden');
+        bannerMsg.textContent = err.message || 'Lỗi không xác định khi quét ảnh';
+      }
+    } finally {
+      btnRun.disabled = false;
+      btnRun.innerHTML = `<i data-lucide="scan" class="w-4 h-4"></i><span>Quét & Bóc Tách Chữ Viết Tay Bằng Vision AI</span>`;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  }
+
+  // ── Xử lý Văn bản Tự do / Giọng nói (NLP) ───────────────────────────────────
+
   async handleRunAiParse() {
     this.requirePassword(() => this.doRunAiParse());
   }
@@ -1353,7 +1638,7 @@ class DisciplineApp {
       return;
     }
 
-    const apiKey = window.geminiService.getApiKey();
+    const apiKey = window.geminiService ? window.geminiService.getApiKey() : null;
     if (!apiKey) {
       this.showToast('Chưa có API Key. Vui lòng cài đặt API Key để sử dụng AI.', 'warning');
       this.openSettingsModal();
@@ -1372,26 +1657,21 @@ class DisciplineApp {
     document.getElementById('global-error-banner').classList.add('hidden');
     document.getElementById('ai-fallback-log').classList.add('hidden');
 
-    // Bắt đầu Stepper
-    this.updateStepperState('running', 1);
-
     const btnRun = document.getElementById('btn-run-ai-parse');
     btnRun.disabled = true;
     btnRun.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Đang Phân Tích...</span>`;
     if (window.lucide) window.lucide.createIcons();
 
     try {
-      // Step 1: Bóc tách thực thể
-      this.updateStepperState('running', 1);
+      // Step 1: Bóc tách thực thể (Hỗ trợ Batching & Exponential Backoff Retry)
+      this.updateStepperState('running', 1, 'Đang phân tích cú pháp ngôn ngữ tự nhiên và trích xuất thực thể...');
       await this.sleep(300);
 
-      // Gọi service với callback fallback
       const response = await window.geminiService.parseViolationInput({
         rawText,
         inputDate: dateVal,
         weekNum,
         activeRules: this.rules,
-        activeStudents: this.students,
         onProgress: (status) => {
           if (status.type === 'fallback') {
             const fallbackLog = document.getElementById('ai-fallback-log');
@@ -1400,28 +1680,42 @@ class DisciplineApp {
               fallbackLog.classList.remove('hidden');
               fallbackText.textContent = status.message;
             }
+          } else if (status.message) {
+            this.updateStepperState('running', 1, status.message);
           }
         }
       });
 
-      // Step 2: Khớp hồ sơ
-      this.updateStepperState('running', 2);
-      await this.sleep(300);
+      const rawRecords = (response.data && response.data.records) ? response.data.records : [];
 
-      // Step 3: Chuẩn hóa & tính điểm
-      this.updateStepperState('running', 3);
-      await this.sleep(300);
+      // Step 2: Kiểm tra & Tách dòng Đa ngày
+      this.updateStepperState('running', 2, 'Kiểm tra và tự động tách dòng độc lập theo từng ngày vi phạm...');
+      await this.sleep(250);
 
-      // Thành công
-      this.updateStepperState('success');
-      this.renderAiPreview(response.data);
+      // Step 3: Đối chiếu CSDL 1.226 học sinh (Smart Heuristics & Fuzzy Matcher)
+      this.updateStepperState('running', 3, 'Đối chiếu CSDL 1.226 học sinh (Smart Heuristics & Khối 10B/11A/12C)...');
+      await this.sleep(250);
 
-      this.showToast(`Phân tích thành công! AI đã bóc tách được ${response.data.records ? response.data.records.length : 0} vi phạm.`, 'success');
+      // Step 4: Chuẩn hóa Quy chế & Áp điểm phạt
+      this.updateStepperState('running', 4, 'Chuẩn hóa quy chế (Quy đổi Áo khoác / Áo đoàn -> Sai đồng phục)...');
+      await this.sleep(200);
+
+      const postProcessed = this.postProcessAiRecords(rawRecords, dateVal, weekNum);
+
+      this.updateStepperState('success', 4, `Phân tích thành công! AI đã xử lý ${postProcessed.records.length} bản ghi.`);
+      this.renderAiPreview(postProcessed);
+
+      this.showToast(`Phân tích thành công! Bóc tách được ${postProcessed.records.length} vi phạm.`, 'success');
+
+      // Tự động mở modal nếu có học sinh trùng tên
+      const firstAmbiguousIdx = postProcessed.records.findIndex(r => r.ambiguous);
+      if (firstAmbiguousIdx !== -1) {
+        setTimeout(() => this.openAmbiguousModal(firstAmbiguousIdx), 400);
+      }
 
     } catch (err) {
       console.error('Lỗi quy trình AI:', err);
-      // Quy tắc AI_INSTRUCTIONS: Khi lỗi, chuyển trạng thái thành "Đã dừng do lỗi", hiển thị nguyên văn lỗi API màu đỏ
-      this.updateStepperState('error', err.message);
+      this.updateStepperState('error', 1, err.message);
       
       const banner = document.getElementById('global-error-banner');
       const bannerMsg = document.getElementById('global-error-message');
@@ -1436,49 +1730,191 @@ class DisciplineApp {
     }
   }
 
-  updateStepperState(status, stepIndex = 1) {
-    const badge = document.getElementById('stepper-badge-status');
-    const progressBar = document.getElementById('stepper-progress-bar');
-    const step1 = document.getElementById('step-item-1');
-    const step2 = document.getElementById('step-item-2');
-    const step3 = document.getElementById('step-item-3');
+  // ── Xử lý Hậu kỳ Toàn diện (Multi-Date Splitting, Fuzzy Matcher, Quy chế lỗi) ──
 
-    // Reset styles
-    [step1, step2, step3].forEach(s => {
-      s.className = 'step-item flex items-start gap-3';
+  postProcessAiRecords(rawRecords, defaultDate, defaultWeek) {
+    if (!Array.isArray(rawRecords)) return { records: [], stats: { total: 0, matched: 0, unmatched: 0, ambiguous: 0, split: 0 } };
+    
+    // 1. Tách dòng đa ngày (Multi-Date Splitting)
+    const dateSplitRecords = (window.geminiService && typeof window.geminiService.splitMultiDateRecords === 'function')
+      ? window.geminiService.splitMultiDateRecords(rawRecords, defaultDate)
+      : rawRecords;
+
+    const processed = [];
+    let ambiguousCount = 0;
+    let unmatchedCount = 0;
+    let splitCount = 0;
+    let matchedCount = 0;
+
+    dateSplitRecords.forEach(rec => {
+      const recDate = rec.date || defaultDate;
+      const recWeek = this.calculateWeek(recDate);
+      const isSplit = !!rec.multiple_dates_split;
+      if (isSplit) splitCount++;
+
+      // 2. Chuẩn hóa Quy chế Lỗi Vi phạm (Áo khoác, Áo đoàn -> "Sai đồng phục" -0.5đ)
+      let cat = rec.violation_category || 'Sai đồng phục';
+      let pts = parseFloat(rec.penalty_points) || 0.5;
+
+      const normRule = (window.geminiService && typeof window.geminiService.normalizeViolationRule === 'function')
+        ? window.geminiService.normalizeViolationRule(cat, rec.original_text || rec.note)
+        : null;
+
+      if (normRule) {
+        cat = normRule.category;
+        pts = normRule.points;
+      } else {
+        const foundRule = this.rules.find(r => r.name.toLowerCase() === cat.toLowerCase());
+        if (foundRule) {
+          cat = foundRule.name;
+          pts = foundRule.points;
+        }
+      }
+
+      // 3. Đối chiếu Học sinh trong CSDL 1.226 học sinh
+      const matchResult = this.matchStudentSmart(rec.student_name, rec.class_name);
+      let finalName = rec.student_name;
+      let finalClass = this.normalizeClassName(rec.class_name);
+      let finalStudentId = rec.student_id || null;
+      let isMatched = false;
+      let isAmbiguous = false;
+      let candidates = [];
+      let warningBadge = null;
+
+      if (matchResult.matched && matchResult.student) {
+        finalName = matchResult.student.name;
+        finalClass = matchResult.student.class;
+        finalStudentId = matchResult.student.id;
+        isMatched = true;
+        matchedCount++;
+      } else if (matchResult.ambiguous) {
+        isAmbiguous = true;
+        candidates = matchResult.candidates || [];
+        ambiguousCount++;
+      } else {
+        // Yêu cầu 3: Không tìm thấy trong CSDL -> Không ngắt tiến trình, gắn cờ cảnh báo đỏ
+        unmatchedCount++;
+        warningBadge = 'Không tìm thấy trong CSDL';
+      }
+
+      processed.push({
+        student_id: finalStudentId,
+        student_name: finalName,
+        class_name: finalClass,
+        matched_student: isMatched,
+        ambiguous: isAmbiguous,
+        candidates: candidates,
+        unmatched_warning: warningBadge,
+        violation_category: cat,
+        penalty_points: pts,
+        date: recDate,
+        week: recWeek,
+        original_text: rec.original_text || rec.note || '',
+        multiple_dates_split: isSplit,
+        split_index: rec.split_index || 1,
+        split_total: rec.split_total || 1
+      });
     });
 
-    if (status === 'running') {
-      badge.textContent = `Đang xử lý Bước ${stepIndex}/3...`;
-      badge.className = 'text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded animate-pulse';
-      progressBar.className = 'h-full bg-blue-600 transition-all duration-300';
-      progressBar.style.width = `${(stepIndex / 3) * 100}%`;
+    return {
+      records: processed,
+      stats: {
+        total: processed.length,
+        matched: matchedCount,
+        unmatched: unmatchedCount,
+        ambiguous: ambiguousCount,
+        split: splitCount
+      }
+    };
+  }
 
-      if (stepIndex >= 1) step1.classList.add('completed');
-      if (stepIndex >= 2) step2.classList.add('completed');
-      if (stepIndex >= 3) step3.classList.add('completed');
+  // ── Điều khiển Stepper 4 bước & Trực quan hóa Trải nghiệm ──────────────────
+
+  updateStepperState(status, stepIndex = 1, customMsg = null) {
+    const badge = document.getElementById('stepper-badge-status');
+    const progressBar = document.getElementById('stepper-progress-bar');
+    const liveLog = document.getElementById('ai-stepper-live-log');
+    const liveLogText = document.getElementById('ai-stepper-live-log-text');
+    
+    const steps = [
+      document.getElementById('step-item-1'),
+      document.getElementById('step-item-2'),
+      document.getElementById('step-item-3'),
+      document.getElementById('step-item-4')
+    ];
+
+    steps.forEach(s => {
+      if (s) s.className = 'step-item flex items-start gap-3';
+    });
+
+    const stepLabels = [
+      'Bóc tách thực thể & Nhận diện',
+      'Kiểm tra & Tách dòng Đa ngày',
+      'Đối chiếu CSDL 1.226 học sinh',
+      'Chuẩn hóa Quy chế & Áp điểm phạt'
+    ];
+
+    if (status === 'running') {
+      const pct = Math.round((stepIndex / 4) * 100);
+      if (badge) {
+        badge.textContent = `Đang xử lý Bước ${stepIndex}/4 (${pct}%)...`;
+        badge.className = 'text-xs font-semibold text-blue-700 bg-blue-100 px-2 py-0.5 rounded animate-pulse';
+      }
+      if (progressBar) {
+        progressBar.className = 'h-full bg-blue-600 transition-all duration-300';
+        progressBar.style.width = `${pct}%`;
+      }
+
+      steps.forEach((s, idx) => {
+        if (s) {
+          if (idx + 1 < stepIndex) s.classList.add('completed');
+          else if (idx + 1 === stepIndex) s.classList.add('active');
+        }
+      });
+
+      if (liveLog && liveLogText) {
+        liveLog.classList.remove('hidden');
+        liveLogText.textContent = customMsg || `Bước ${stepIndex}: ${stepLabels[stepIndex - 1] || 'Đang xử lý...'}`;
+      }
 
     } else if (status === 'success') {
-      badge.textContent = 'Hoàn tất phân tích';
-      badge.className = 'text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded';
-      progressBar.className = 'h-full bg-emerald-500 transition-all duration-300';
-      progressBar.style.width = '100%';
+      if (badge) {
+        badge.textContent = 'Hoàn tất phân tích 100%';
+        badge.className = 'text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded';
+      }
+      if (progressBar) {
+        progressBar.className = 'h-full bg-emerald-500 transition-all duration-300';
+        progressBar.style.width = '100%';
+      }
+      steps.forEach(s => { if (s) s.classList.add('completed'); });
 
-      [step1, step2, step3].forEach(s => s.classList.add('completed'));
+      if (liveLog && liveLogText) {
+        liveLog.classList.remove('hidden');
+        liveLogText.textContent = customMsg || 'Toàn bộ quy trình AI đã hoàn thành xuất sắc.';
+      }
 
     } else if (status === 'error') {
-      // Tuân thủ AI_INSTRUCTIONS: "Đã dừng do lỗi", tuyệt đối không hiện checkmark xanh nếu quy trình bị gián đoạn
-      badge.textContent = 'Đã dừng do lỗi';
-      badge.className = 'text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200';
-      progressBar.className = 'h-full bg-red-500 transition-all duration-300';
-      
-      [step1, step2, step3].forEach(s => s.classList.add('error'));
+      if (badge) {
+        badge.textContent = 'Đã dừng do lỗi';
+        badge.className = 'text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200';
+      }
+      if (progressBar) {
+        progressBar.className = 'h-full bg-red-500 transition-all duration-300';
+      }
+      steps.forEach(s => { if (s) s.classList.add('error'); });
+
+      if (liveLog && liveLogText) {
+        liveLog.classList.remove('hidden');
+        liveLogText.textContent = customMsg || 'Quy trình bị gián đoạn do lỗi kết nối API.';
+      }
     }
   }
 
   resetAiStepper() {
     const badge = document.getElementById('stepper-badge-status');
     const progressBar = document.getElementById('stepper-progress-bar');
+    const liveLog = document.getElementById('ai-stepper-live-log');
+
     if (badge) {
       badge.textContent = 'Sẵn sàng';
       badge.className = 'text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded';
@@ -1487,13 +1923,99 @@ class DisciplineApp {
       progressBar.className = 'h-full bg-blue-600 w-0 transition-all duration-300';
       progressBar.style.width = '0%';
     }
-    const step1 = document.getElementById('step-item-1');
-    const step2 = document.getElementById('step-item-2');
-    const step3 = document.getElementById('step-item-3');
-    [step1, step2, step3].forEach(s => {
+    if (liveLog) liveLog.classList.add('hidden');
+
+    const steps = [
+      document.getElementById('step-item-1'),
+      document.getElementById('step-item-2'),
+      document.getElementById('step-item-3'),
+      document.getElementById('step-item-4')
+    ];
+    steps.forEach(s => {
       if (s) s.className = 'step-item flex items-start gap-3';
     });
   }
+
+  // ── Modal Xử lý Trùng Tên (Ambiguity Resolution) ────────────────────────────
+
+  openAmbiguousModal(recordIdx) {
+    const rec = this.pendingAiRecords[recordIdx];
+    if (!rec || !rec.ambiguous || !rec.candidates || rec.candidates.length === 0) return;
+    this._currentAmbiguousRecordIndex = recordIdx;
+
+    const modal = document.getElementById('modal-resolve-ambiguous-student');
+    const sourceName = document.getElementById('ambiguous-source-name');
+    const sourceClass = document.getElementById('ambiguous-source-class');
+    const list = document.getElementById('ambiguous-candidates-list');
+
+    if (sourceName) sourceName.textContent = rec.student_name;
+    if (sourceClass) sourceClass.textContent = rec.class_name || 'Chưa rõ';
+
+    if (list) {
+      list.innerHTML = rec.candidates.map((cand) => `
+        <div class="p-3 bg-white hover:bg-blue-50/70 border border-slate-200 rounded-xl flex items-center justify-between gap-3 transition">
+          <div>
+            <div class="font-bold text-slate-900 text-sm">${cand.name}</div>
+            <div class="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+              <span class="font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded">${cand.class}</span>
+              <span>Mã HS: #${cand.id}</span>
+              <span>Giới tính: ${cand.gender || 'Chưa rõ'}</span>
+            </div>
+          </div>
+          <button type="button" onclick="window.app.resolveAmbiguousStudent(${recordIdx}, ${cand.id})" class="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition shadow-xs cursor-pointer">
+            Chọn học sinh này
+          </button>
+        </div>
+      `).join('');
+    }
+
+    if (modal) modal.classList.remove('hidden');
+    if (window.lucide) window.lucide.createIcons();
+  }
+
+  resolveAmbiguousStudent(recordIdx, studentId) {
+    const rec = this.pendingAiRecords[recordIdx];
+    if (!rec) return;
+    const cand = (rec.candidates || []).find(c => c.id === studentId) || this.students.find(s => s.id === studentId);
+    if (cand) {
+      rec.student_name = cand.name;
+      rec.class_name = cand.class;
+      rec.student_id = cand.id;
+      rec.matched_student = true;
+      rec.ambiguous = false;
+      rec.candidates = [];
+      rec.unmatched_warning = null;
+    }
+    this.closeAmbiguousModal();
+    this.renderAiPreview({ records: this.pendingAiRecords });
+    this.showToast(`Đã chuẩn hóa học sinh: ${rec.student_name} (${rec.class_name})`, 'success');
+
+    // Nếu còn bản ghi trùng tên khác, tự động mở tiếp
+    const nextAmbiguousIdx = this.pendingAiRecords.findIndex(r => r.ambiguous);
+    if (nextAmbiguousIdx !== -1) {
+      setTimeout(() => this.openAmbiguousModal(nextAmbiguousIdx), 300);
+    }
+  }
+
+  resolveAmbiguousKeepRaw(recordIdx) {
+    const rec = this.pendingAiRecords[recordIdx];
+    if (rec) {
+      rec.ambiguous = false;
+      rec.matched_student = false;
+      rec.unmatched_warning = 'Tên gốc chưa khớp CSDL';
+    }
+    this.closeAmbiguousModal();
+    this.renderAiPreview({ records: this.pendingAiRecords });
+    this.showToast('Đã giữ nguyên tên gốc theo ghi chép sổ tay.', 'info');
+  }
+
+  closeAmbiguousModal() {
+    this._currentAmbiguousRecordIndex = null;
+    const modal = document.getElementById('modal-resolve-ambiguous-student');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  // ── Kết quả Xem trước (Preview Card) ────────────────────────────────────────
 
   renderAiPreview(parsedData) {
     const card = document.getElementById('ai-result-preview-card');
@@ -1505,37 +2027,95 @@ class DisciplineApp {
     this.pendingAiRecords = parsedData.records || [];
     countBadge.textContent = this.pendingAiRecords.length;
 
+    // Cập nhật thống kê KPI tags
+    let matchedCount = 0;
+    let unmatchedCount = 0;
+    let splitCount = 0;
+    let ambiguousCount = 0;
+
+    this.pendingAiRecords.forEach(r => {
+      if (r.matched_student) matchedCount++;
+      if (r.unmatched_warning) unmatchedCount++;
+      if (r.multiple_dates_split) splitCount++;
+      if (r.ambiguous) ambiguousCount++;
+    });
+
+    const elValMatched = document.getElementById('val-kpi-matched');
+    const elValUnmatched = document.getElementById('val-kpi-unmatched');
+    const elValSplit = document.getElementById('val-kpi-split');
+    const elValAmbiguous = document.getElementById('val-kpi-ambiguous');
+
+    const kpiUnmatched = document.getElementById('kpi-unmatched-count');
+    const kpiSplit = document.getElementById('kpi-split-count');
+    const kpiAmbiguous = document.getElementById('kpi-ambiguous-count');
+
+    if (elValMatched) elValMatched.textContent = matchedCount;
+    if (elValUnmatched) elValUnmatched.textContent = unmatchedCount;
+    if (elValSplit) elValSplit.textContent = splitCount;
+    if (elValAmbiguous) elValAmbiguous.textContent = ambiguousCount;
+
+    if (kpiUnmatched) kpiUnmatched.classList.toggle('hidden', unmatchedCount === 0);
+    if (kpiSplit) kpiSplit.classList.toggle('hidden', splitCount === 0);
+    if (kpiAmbiguous) kpiAmbiguous.classList.toggle('hidden', ambiguousCount === 0);
+
     if (this.pendingAiRecords.length === 0) {
-      list.innerHTML = `<p class="text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200">Không tìm thấy thông tin vi phạm cụ thể trong văn bản đã nhập.</p>`;
+      list.innerHTML = `<p class="text-xs text-amber-700 bg-amber-50 p-3 rounded-lg border border-amber-200">Không tìm thấy thông tin vi phạm cụ thể trong dữ liệu đã xử lý.</p>`;
       card.classList.remove('hidden');
       return;
     }
 
-    list.innerHTML = this.pendingAiRecords.map((r, idx) => `
-      <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start justify-between gap-3 text-xs">
-        <div class="space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-slate-900">${r.student_name || 'Chưa rõ tên'}</span>
-            <span class="font-bold text-blue-700 bg-blue-100 px-1.5 py-0.2 rounded text-[11px]">${r.class_name || 'Chưa rõ lớp'}</span>
-            ${r.matched_student ? 
-              `<span class="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-semibold">Khớp CSDL</span>` : 
-              `<span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.2 rounded font-semibold">Tên mới/Chưa khớp</span>`}
-          </div>
-          <div class="text-slate-700 font-medium flex items-center gap-1.5">
-            <span class="text-slate-400">Lỗi quy đổi:</span>
-            <strong class="text-slate-900">${r.violation_category}</strong>
-            <span class="text-red-600 font-bold bg-red-50 border border-red-200 px-1.5 py-0.2 rounded">-${r.penalty_points}đ</span>
-          </div>
-          <div class="text-[11px] text-slate-500 italic">
-            Ghi chú gốc: "${r.original_text || ''}"
-          </div>
-        </div>
+    list.innerHTML = this.pendingAiRecords.map((r, idx) => {
+      // Phân loại kiểu card (bình thường, cảnh báo đỏ chưa khớp, hoặc trùng tên)
+      const isUnmatched = !r.matched_student && !r.ambiguous;
+      const borderClass = r.ambiguous
+        ? 'border-amber-300 bg-amber-50/50'
+        : (isUnmatched ? 'border-red-300 bg-red-50/40' : 'border-slate-200 bg-slate-50/60');
 
-        <button onclick="window.app.removePendingAiRecord(${idx})" class="text-slate-400 hover:text-red-600 p-1 rounded" title="Bỏ dòng này">
-          <i data-lucide="trash" class="w-3.5 h-3.5"></i>
-        </button>
-      </div>
-    `).join('');
+      return `
+        <div class="p-3.5 border ${borderClass} rounded-2xl flex items-start justify-between gap-3 text-xs transition shadow-2xs">
+          <div class="space-y-1.5 flex-1">
+            <!-- Student Header & Badges -->
+            <div class="flex flex-wrap items-center gap-1.5">
+              <span class="font-bold text-slate-900 text-sm">${r.student_name || 'Chưa rõ tên'}</span>
+              <span class="font-extrabold text-blue-700 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded text-[11px]">${r.class_name || 'Chưa rõ lớp'}</span>
+
+              ${r.matched_student ? 
+                `<span class="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded font-bold">✓ Khớp CSDL</span>` : ''}
+
+              ${r.unmatched_warning ? 
+                `<span class="text-[10px] bg-red-100 text-red-700 border border-red-300 px-2 py-0.5 rounded font-bold">⚠️ ${r.unmatched_warning}</span>` : ''}
+
+              ${r.multiple_dates_split ? 
+                `<span class="text-[10px] bg-purple-100 text-purple-700 border border-purple-300 px-2 py-0.5 rounded font-bold">📅 Ngày ${r.date} (Tuần ${r.week})</span>` : ''}
+
+              ${r.ambiguous ? 
+                `<button type="button" onclick="window.app.openAmbiguousModal(${idx})" class="text-[10px] bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full font-bold cursor-pointer animate-pulse flex items-center gap-1">
+                  <i data-lucide="help-circle" class="w-3 h-3"></i>
+                  <span>Trùng tên: Bấm để chọn (${r.candidates ? r.candidates.length : 0} gợi ý)</span>
+                </button>` : ''}
+            </div>
+
+            <!-- Violation Rule & Penalty Points -->
+            <div class="text-slate-700 font-medium flex items-center gap-2 pt-0.5">
+              <span class="text-slate-400">Lỗi quy đổi:</span>
+              <strong class="text-slate-900 font-bold">${r.violation_category}</strong>
+              <span class="text-red-600 font-extrabold bg-red-50 border border-red-200 px-2 py-0.5 rounded">-${r.penalty_points}đ</span>
+              ${!r.multiple_dates_split && r.date ? `<span class="text-slate-400 text-[11px]">• ${r.date}</span>` : ''}
+            </div>
+
+            <!-- Original Note -->
+            ${r.original_text ? `
+              <div class="text-[11px] text-slate-500 italic bg-white/70 p-1.5 rounded-lg border border-slate-100">
+                Ghi chú gốc: "${r.original_text}"
+              </div>` : ''}
+          </div>
+
+          <button onclick="window.app.removePendingAiRecord(${idx})" class="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-white transition cursor-pointer" title="Bỏ bản ghi này">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
+        </div>
+      `;
+    }).join('');
 
     card.classList.remove('hidden');
     if (window.lucide) window.lucide.createIcons();
@@ -1591,17 +2171,112 @@ class DisciplineApp {
     });
 
     this.saveViolations();
-    this.logAuditAction('ADD_VIOLATION', 'Nhập vi phạm AI', `Đã xác nhận và lưu ${countSaved} bản ghi vi phạm từ văn bản/giọng nói AI`, { count: countSaved });
+    this.logAuditAction('ADD_VIOLATION', 'Nhập vi phạm AI', `Đã xác nhận và lưu ${countSaved} bản ghi vi phạm từ văn bản/ảnh sổ tay AI`, { count: countSaved });
     this.pendingAiRecords = [];
     document.getElementById('ai-result-preview-card').classList.add('hidden');
-    document.getElementById('ai-input-text').value = '';
+    const inputArea = document.getElementById('ai-input-text');
+    if (inputArea) inputArea.value = '';
+    this.clearOcrImage();
     this.resetAiStepper();
 
-    this.showToast('Đã lưu các bản ghi vi phạm vào Nhật ký!', 'success');
+    this.showToast(`Đã lưu ${countSaved} bản ghi vi phạm vào Nhật ký!`, 'success');
     this.switchTab('tab-violation-logs');
   }
 
   // ==================== CHUẨN HÓA LỚP & BỘ LỌC THÔNG MINH ====================
+
+  levenshteinDistance(a, b) {
+    if (!a || !b) return (a || b || '').length;
+    const m = a.length, n = b.length;
+    const d = [];
+    for (let i = 0; i <= m; i++) d[i] = [i];
+    for (let j = 0; j <= n; j++) d[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      }
+    }
+    return d[m][n];
+  }
+
+  matchStudentSmart(rawName, rawClass) {
+    if (!rawName) return { matched: false, notFound: true, candidates: [] };
+    const targetClass = this.normalizeClassName(rawClass);
+    const cleanName = String(rawName).trim()
+      .replace(/^(?:học\s*sinh|bạn|em)\s+/i, '')
+      .replace(/\s*-\s*l[ớơo]p.*$/i, '')
+      .trim();
+
+    const cleanNameNorm = this.removeVietnameseTones(cleanName.toLowerCase());
+    const nameTokens = cleanNameNorm.split(/\s+/).filter(Boolean);
+    const givenName = nameTokens[nameTokens.length - 1] || '';
+
+    // 1. Phân loại pool tìm kiếm: ưu tiên lớp nếu nhận diện được
+    let pool = targetClass ? this.students.filter(s => s.class === targetClass) : this.students;
+    if (pool.length === 0) pool = this.students;
+
+    // 2. So khớp chính xác 100% cả họ và tên
+    const exact = pool.filter(s => s.name.toLowerCase() === cleanName.toLowerCase());
+    if (exact.length === 1) return { matched: true, status: 'exact', student: exact[0], candidates: exact };
+    if (exact.length > 1) return { matched: false, ambiguous: true, candidates: exact };
+
+    // 3. So khớp không dấu chính xác
+    const toneFreeExact = pool.filter(s => this.removeVietnameseTones(s.name.toLowerCase()) === cleanNameNorm);
+    if (toneFreeExact.length === 1) return { matched: true, status: 'tone_free', student: toneFreeExact[0], candidates: toneFreeExact };
+    if (toneFreeExact.length > 1) return { matched: false, ambiguous: true, candidates: toneFreeExact };
+
+    // 4. So khớp theo các token (ví dụ: 'Âu Kỳ' trong 'Lê Âu Kỳ', 'Bo' trong 'Nguyễn Bo')
+    const tokenMatches = pool.filter(s => {
+      const sNorm = this.removeVietnameseTones(s.name.toLowerCase());
+      return nameTokens.every(tok => sNorm.includes(tok));
+    });
+
+    if (tokenMatches.length === 1) {
+      return { matched: true, status: 'token_single', student: tokenMatches[0], candidates: tokenMatches };
+    } else if (tokenMatches.length > 1) {
+      // Nếu có tên gọi trùng khớp chính xác
+      const givenExact = tokenMatches.filter(s => {
+        const sTokens = this.removeVietnameseTones(s.name.toLowerCase()).split(/\s+/);
+        return sTokens[sTokens.length - 1] === givenName;
+      });
+      if (givenExact.length === 1) {
+        return { matched: true, status: 'given_name_exact', student: givenExact[0], candidates: givenExact };
+      }
+      return { matched: false, ambiguous: true, candidates: tokenMatches };
+    }
+
+    // 5. So khớp tên gọi riêng trong lớp (ví dụ viết tắt: "Vy 10B01", "Kỳ 10B11", "An 12C08")
+    if (targetClass && givenName.length >= 2) {
+      const givenMatches = pool.filter(s => {
+        const sTokens = this.removeVietnameseTones(s.name.toLowerCase()).split(/\s+/);
+        return sTokens[sTokens.length - 1] === givenName;
+      });
+      if (givenMatches.length === 1) {
+        return { matched: true, status: 'given_name_class', student: givenMatches[0], candidates: givenMatches };
+      } else if (givenMatches.length > 1) {
+        return { matched: false, ambiguous: true, candidates: givenMatches };
+      }
+    }
+
+    // 6. So khớp mờ Fuzzy Levenshtein (khắc phục chữ viết tay bị lỗi 1-2 ký tự)
+    if (cleanNameNorm.length >= 4) {
+      const fuzzyMatches = pool.map(s => {
+        const sNorm = this.removeVietnameseTones(s.name.toLowerCase());
+        const dist = this.levenshteinDistance(cleanNameNorm, sNorm);
+        return { student: s, dist };
+      }).filter(item => item.dist <= 2);
+
+      if (fuzzyMatches.length === 1) {
+        return { matched: true, status: 'fuzzy_levenshtein', student: fuzzyMatches[0].student, candidates: [fuzzyMatches[0].student] };
+      } else if (fuzzyMatches.length > 1) {
+        return { matched: false, ambiguous: true, candidates: fuzzyMatches.map(m => m.student) };
+      }
+    }
+
+    // 7. Yêu cầu 3: Không tìm thấy trong CSDL 1.226 học sinh (Không dừng tiến trình)
+    return { matched: false, notFound: true, candidates: [] };
+  }
 
   normalizeClassName(raw) {
     if (!raw) return '';
