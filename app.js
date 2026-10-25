@@ -1588,24 +1588,27 @@ class DisciplineApp {
       this.updateStepperState('running', 2, 'Kiểm tra và tự động tách dòng độc lập theo từng ngày vi phạm...');
       await this.sleep(250);
 
-      // Step 3 & 4: Đối chiếu CSDL 1.226 học sinh & Chuẩn hóa quy chế
-      this.updateStepperState('running', 3, 'Đối chiếu CSDL 1.226 học sinh (Smart Heuristics)...');
+      // Step 3: Đối chiếu CSDL 1.226 học sinh (Smart Heuristics)
+      this.updateStepperState('running', 3, 'Đối chiếu CSDL 1.226 học sinh (Smart Heuristics & Khối 10B/11A/12C)...');
       await this.sleep(250);
-
-      this.updateStepperState('running', 4, 'Chuẩn hóa quy chế (Áo khoác/Áo đoàn -> Sai đồng phục)...');
-      await this.sleep(200);
 
       const postProcessed = this.postProcessAiRecords(rawRecords, dateVal, weekNum);
 
-      this.updateStepperState('success', 4, `Vision AI đã bóc tách thành công ${postProcessed.records.length} bản ghi vi phạm từ ảnh!`);
-      this.renderAiPreview(postProcessed);
-
-      this.showToast(`Vision AI đã quét xong! Tìm thấy ${postProcessed.records.length} vi phạm.`, 'success');
-
-      // Tự động bật modal nếu có học sinh trùng tên
+      // Kiểm tra xem có học sinh trùng tên / khác họ cần giải quyết không
       const firstAmbiguousIdx = postProcessed.records.findIndex(r => r.ambiguous);
+
       if (firstAmbiguousIdx !== -1) {
+        // DỪNG TIẾN TRÌNH TẠI BƯỚC 3, BẬT POPUP CHO GIÁO VIÊN CHỌN
+        this.updateStepperState('running', 3, '⚠️ Phát hiện học sinh trùng tên / khác họ: Đang chờ giáo viên chọn học sinh thực tế...');
+        this.renderAiPreview(postProcessed);
         setTimeout(() => this.openAmbiguousModal(firstAmbiguousIdx), 400);
+      } else {
+        // Step 4: Chuẩn hóa Quy chế & Áp điểm phạt
+        this.updateStepperState('running', 4, 'Chuẩn hóa quy chế (Áo khoác/Áo đoàn -> Sai đồng phục)...');
+        await this.sleep(200);
+        this.updateStepperState('success', 4, `Vision AI đã bóc tách thành công ${postProcessed.records.length} bản ghi vi phạm từ ảnh sổ tay!`);
+        this.renderAiPreview(postProcessed);
+        this.showToast(`Vision AI đã quét xong! Tìm thấy ${postProcessed.records.length} vi phạm.`, 'success');
       }
 
     } catch (err) {
@@ -1696,21 +1699,21 @@ class DisciplineApp {
       this.updateStepperState('running', 3, 'Đối chiếu CSDL 1.226 học sinh (Smart Heuristics & Khối 10B/11A/12C)...');
       await this.sleep(250);
 
-      // Step 4: Chuẩn hóa Quy chế & Áp điểm phạt
-      this.updateStepperState('running', 4, 'Chuẩn hóa quy chế (Quy đổi Áo khoác / Áo đoàn -> Sai đồng phục)...');
-      await this.sleep(200);
-
       const postProcessed = this.postProcessAiRecords(rawRecords, dateVal, weekNum);
 
-      this.updateStepperState('success', 4, `Phân tích thành công! AI đã xử lý ${postProcessed.records.length} bản ghi.`);
-      this.renderAiPreview(postProcessed);
-
-      this.showToast(`Phân tích thành công! Bóc tách được ${postProcessed.records.length} vi phạm.`, 'success');
-
-      // Tự động mở modal nếu có học sinh trùng tên
       const firstAmbiguousIdx = postProcessed.records.findIndex(r => r.ambiguous);
       if (firstAmbiguousIdx !== -1) {
+        // DỪNG TIẾN TRÌNH TẠI BƯỚC 3, BẬT POPUP CHO GIÁO VIÊN CHỌN
+        this.updateStepperState('running', 3, '⚠️ Phát hiện học sinh trùng tên / khác họ: Đang chờ giáo viên chọn học sinh thực tế...');
+        this.renderAiPreview(postProcessed);
         setTimeout(() => this.openAmbiguousModal(firstAmbiguousIdx), 400);
+      } else {
+        // Step 4: Chuẩn hóa Quy chế & Áp điểm phạt
+        this.updateStepperState('running', 4, 'Chuẩn hóa quy chế (Quy đổi Áo khoác / Áo đoàn -> Sai đồng phục)...');
+        await this.sleep(200);
+        this.updateStepperState('success', 4, `Phân tích thành công! AI đã xử lý ${postProcessed.records.length} bản ghi.`);
+        this.renderAiPreview(postProcessed);
+        this.showToast(`Phân tích thành công! Bóc tách được ${postProcessed.records.length} vi phạm.`, 'success');
       }
 
     } catch (err) {
@@ -2006,6 +2009,8 @@ class DisciplineApp {
     const nextAmbiguousIdx = this.pendingAiRecords.findIndex(r => r.ambiguous);
     if (nextAmbiguousIdx !== -1) {
       setTimeout(() => this.openAmbiguousModal(nextAmbiguousIdx), 300);
+    } else {
+      this.updateStepperState('success', 4, 'Đã chuẩn hóa toàn bộ học sinh và áp khung điểm phạt! Sẵn sàng lưu vào Google Sheets.');
     }
   }
 
@@ -2150,6 +2155,14 @@ class DisciplineApp {
 
   doConfirmSaveAiViolations() {
     if (!this.pendingAiRecords || this.pendingAiRecords.length === 0) return;
+
+    // Kiểm tra an toàn: Tuyệt đối không lưu nếu còn học sinh trùng tên / khác họ chưa được chọn
+    const remainingAmbiguousIdx = this.pendingAiRecords.findIndex(r => r.ambiguous);
+    if (remainingAmbiguousIdx !== -1) {
+      this.showToast('Vui lòng chọn học sinh trùng tên / khác họ từ danh sách gợi ý trước khi lưu vào Google Sheets!', 'warning');
+      this.openAmbiguousModal(remainingAmbiguousIdx);
+      return;
+    }
 
     const affectedWeeksAndClasses = new Map();
     const now = new Date();
