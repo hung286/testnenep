@@ -1781,6 +1781,7 @@ class DisciplineApp {
       let candidates = [];
       let warningBadge = null;
 
+      let ambiguityReason = null;
       if (matchResult.matched && matchResult.student) {
         finalName = matchResult.student.name;
         finalClass = matchResult.student.class;
@@ -1790,6 +1791,7 @@ class DisciplineApp {
       } else if (matchResult.ambiguous) {
         isAmbiguous = true;
         candidates = matchResult.candidates || [];
+        ambiguityReason = matchResult.reason || 'same_given_diff_surname_multi';
         ambiguousCount++;
       } else {
         // Yêu cầu 3: Không tìm thấy trong CSDL -> Không ngắt tiến trình, gắn cờ cảnh báo đỏ
@@ -1803,6 +1805,7 @@ class DisciplineApp {
         class_name: finalClass,
         matched_student: isMatched,
         ambiguous: isAmbiguous,
+        ambiguity_reason: ambiguityReason,
         candidates: candidates,
         unmatched_warning: warningBadge,
         violation_category: cat,
@@ -1947,9 +1950,18 @@ class DisciplineApp {
     const sourceName = document.getElementById('ambiguous-source-name');
     const sourceClass = document.getElementById('ambiguous-source-class');
     const list = document.getElementById('ambiguous-candidates-list');
+    const modalSubtitle = document.getElementById('ambiguous-modal-subtitle');
 
     if (sourceName) sourceName.textContent = rec.student_name;
     if (sourceClass) sourceClass.textContent = rec.class_name || 'Chưa rõ';
+
+    let reasonText = 'Phát hiện nhiều học sinh tương tự trong CSDL';
+    if (rec.ambiguity_reason === 'same_given_diff_surname_multi') {
+      reasonText = 'Trùng Tên trong cùng Lớp nhưng Khác Họ / Mập mờ họ: Vui lòng bấm chọn đúng học sinh thực tế:';
+    } else if (rec.ambiguity_reason === 'diff_surname_single_candidate') {
+      reasonText = 'Họ ghi chép khác với CSDL của học sinh cùng tên trong lớp: Vui lòng kiểm tra và xác nhận:';
+    }
+    if (modalSubtitle) modalSubtitle.textContent = reasonText;
 
     if (list) {
       list.innerHTML = rec.candidates.map((cand) => `
@@ -2211,22 +2223,78 @@ class DisciplineApp {
     const cleanNameNorm = this.removeVietnameseTones(cleanName.toLowerCase());
     const nameTokens = cleanNameNorm.split(/\s+/).filter(Boolean);
     const givenName = nameTokens[nameTokens.length - 1] || '';
+    const surname = nameTokens.length > 1 ? nameTokens[0] : '';
 
     // 1. Phân loại pool tìm kiếm: ưu tiên lớp nếu nhận diện được
     let pool = targetClass ? this.students.filter(s => s.class === targetClass) : this.students;
     if (pool.length === 0) pool = this.students;
 
-    // 2. So khớp chính xác 100% cả họ và tên
+    // 2. So khớp chính xác 100% cả họ và tên (case-insensitive)
     const exact = pool.filter(s => s.name.toLowerCase() === cleanName.toLowerCase());
     if (exact.length === 1) return { matched: true, status: 'exact', student: exact[0], candidates: exact };
-    if (exact.length > 1) return { matched: false, ambiguous: true, candidates: exact };
+    if (exact.length > 1) return { matched: false, ambiguous: true, reason: 'exact_multi', candidates: exact };
 
-    // 3. So khớp không dấu chính xác
+    // 3. So khớp không dấu chính xác 100%
     const toneFreeExact = pool.filter(s => this.removeVietnameseTones(s.name.toLowerCase()) === cleanNameNorm);
     if (toneFreeExact.length === 1) return { matched: true, status: 'tone_free', student: toneFreeExact[0], candidates: toneFreeExact };
-    if (toneFreeExact.length > 1) return { matched: false, ambiguous: true, candidates: toneFreeExact };
+    if (toneFreeExact.length > 1) return { matched: false, ambiguous: true, reason: 'tone_free_multi', candidates: toneFreeExact };
 
-    // 4. So khớp theo các token (ví dụ: 'Âu Kỳ' trong 'Lê Âu Kỳ', 'Bo' trong 'Nguyễn Bo')
+    // 4. QUY TẮC CỐT LÕI: Trùng Tên trong cùng Lớp nhưng Khác Họ / Mập Mờ Họ
+    const sameGivenInClass = pool.filter(s => {
+      const sTokens = this.removeVietnameseTones(s.name.toLowerCase()).split(/\s+/);
+      return sTokens[sTokens.length - 1] === givenName;
+    });
+
+    if (sameGivenInClass.length > 0) {
+      // Trường hợp 4.1: Có từ 2 học sinh cùng tên trong lớp trở lên (VD: 10B01 có cả 'Mã Ngọc Bảo An' và 'Vy Thị Tường An')
+      if (sameGivenInClass.length > 1) {
+        if (surname) {
+          const exactSurnameMatches = sameGivenInClass.filter(s => {
+            const sTokens = this.removeVietnameseTones(s.name.toLowerCase()).split(/\s+/);
+            return sTokens[0] === surname;
+          });
+          if (exactSurnameMatches.length === 1) {
+            return { matched: true, status: 'exact_surname_given', student: exactSurnameMatches[0], candidates: exactSurnameMatches };
+          }
+        }
+        // Khác họ (VD: sổ ghi 'Nguyễn Văn An' mà CSDL chỉ có 'Mã Ngọc Bảo An' & 'Vy Thị Tường An') hoặc chỉ ghi tên:
+        // TUYỆT ĐỐI KHÔNG GÁN BỪA -> BẮT BUỘC DỪNG & BẬT POPUP CHO GIÁO VIÊN CHỌN
+        return {
+          matched: false,
+          ambiguous: true,
+          reason: 'same_given_diff_surname_multi',
+          candidates: sameGivenInClass
+        };
+      }
+
+      // Trường hợp 4.2: Trong lớp chỉ có ĐÚNG 1 học sinh mang tên đó
+      if (sameGivenInClass.length === 1) {
+        const candidate = sameGivenInClass[0];
+        const cTokens = this.removeVietnameseTones(candidate.name.toLowerCase()).split(/\s+/);
+        const cSurname = cTokens[0];
+
+        // Nếu người dùng nhập cả họ và tên, NHƯNG HỌ HOÀN TOÀN KHÁC (VD: ghi 'Trần Bo 11A04' nhưng CSDL là 'Nguyễn Bo')
+        // TUYỆT ĐỐI KHÔNG TỰ Ý GÁN -> Bật popup yêu cầu xác nhận
+        if (surname && surname !== cSurname && surname.length > 1) {
+          return {
+            matched: false,
+            ambiguous: true,
+            reason: 'diff_surname_single_candidate',
+            candidates: [candidate]
+          };
+        }
+
+        // Họ khớp hoặc chỉ ghi tên gọi/tên đệm (VD: 'Bo 11A04' -> 'Nguyễn Bo', 'Kỳ 10B11' -> 'Lê Âu Kỳ')
+        return {
+          matched: true,
+          status: 'single_given_match',
+          student: candidate,
+          candidates: [candidate]
+        };
+      }
+    }
+
+    // 5. So khớp theo các token trong họ tên
     const tokenMatches = pool.filter(s => {
       const sNorm = this.removeVietnameseTones(s.name.toLowerCase());
       return nameTokens.every(tok => sNorm.includes(tok));
@@ -2235,28 +2303,7 @@ class DisciplineApp {
     if (tokenMatches.length === 1) {
       return { matched: true, status: 'token_single', student: tokenMatches[0], candidates: tokenMatches };
     } else if (tokenMatches.length > 1) {
-      // Nếu có tên gọi trùng khớp chính xác
-      const givenExact = tokenMatches.filter(s => {
-        const sTokens = this.removeVietnameseTones(s.name.toLowerCase()).split(/\s+/);
-        return sTokens[sTokens.length - 1] === givenName;
-      });
-      if (givenExact.length === 1) {
-        return { matched: true, status: 'given_name_exact', student: givenExact[0], candidates: givenExact };
-      }
-      return { matched: false, ambiguous: true, candidates: tokenMatches };
-    }
-
-    // 5. So khớp tên gọi riêng trong lớp (ví dụ viết tắt: "Vy 10B01", "Kỳ 10B11", "An 12C08")
-    if (targetClass && givenName.length >= 2) {
-      const givenMatches = pool.filter(s => {
-        const sTokens = this.removeVietnameseTones(s.name.toLowerCase()).split(/\s+/);
-        return sTokens[sTokens.length - 1] === givenName;
-      });
-      if (givenMatches.length === 1) {
-        return { matched: true, status: 'given_name_class', student: givenMatches[0], candidates: givenMatches };
-      } else if (givenMatches.length > 1) {
-        return { matched: false, ambiguous: true, candidates: givenMatches };
-      }
+      return { matched: false, ambiguous: true, reason: 'token_multi', candidates: tokenMatches };
     }
 
     // 6. So khớp mờ Fuzzy Levenshtein (khắc phục chữ viết tay bị lỗi 1-2 ký tự)
@@ -2270,11 +2317,11 @@ class DisciplineApp {
       if (fuzzyMatches.length === 1) {
         return { matched: true, status: 'fuzzy_levenshtein', student: fuzzyMatches[0].student, candidates: [fuzzyMatches[0].student] };
       } else if (fuzzyMatches.length > 1) {
-        return { matched: false, ambiguous: true, candidates: fuzzyMatches.map(m => m.student) };
+        return { matched: false, ambiguous: true, reason: 'fuzzy_multi', candidates: fuzzyMatches.map(m => m.student) };
       }
     }
 
-    // 7. Yêu cầu 3: Không tìm thấy trong CSDL 1.226 học sinh (Không dừng tiến trình)
+    // 7. Hoàn toàn không tìm thấy trong CSDL 1.226 học sinh (Không dừng tiến trình, đánh dấu đỏ cảnh báo)
     return { matched: false, notFound: true, candidates: [] };
   }
 
