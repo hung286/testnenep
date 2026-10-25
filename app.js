@@ -632,8 +632,9 @@ class DisciplineApp {
   }
 
   init() {
-    // 0. Quét và loại bỏ sạch cache cũ và link kvdb.io
+    // 0. Quét và loại bỏ sạch cache cũ và link kvdb.io, ép Endpoint Google Sheets chuẩn
     this.purgeObsoleteCache();
+    this.updateCloudStatusBadge(true);
 
     // 1. Tự động gán và lưu API Key ngầm
     const DEFAULT_API_KEY = typeof atob !== "undefined" ? atob("QVEuQWI4Uk42S05UclVUVEFDaTZoOTQwRW5ETEt1LW1UUTdMcTVldlRsQUx0aVBDSG9jOEE=") : "";
@@ -998,11 +999,53 @@ class DisciplineApp {
       btnRotateImg.addEventListener('click', () => this.rotateOcrImage());
     }
 
-    // Nút chạy AI Vision
+    // Nút chạy AI Vision (1 Chạm trực tiếp)
     const btnRunVision = document.getElementById('btn-run-ai-vision');
     if (btnRunVision) {
       btnRunVision.addEventListener('click', () => {
         this.requirePassword(() => this.handleRunAiVisionParse());
+      });
+    }
+
+    // Quy trình 2 Bước: Bước 1 (Trích xuất văn bản thô OCR)
+    const btnRunOcrStep1 = document.getElementById('btn-run-ocr-step1');
+    if (btnRunOcrStep1) {
+      btnRunOcrStep1.addEventListener('click', () => {
+        this.requirePassword(() => this.handleRunAiOcrStep1());
+      });
+    }
+
+    // Quy trình 2 Bước: Bước 2 (Chuẩn hóa văn bản thô & Đẩy lên Cloud)
+    const btnRunOcrStep2 = document.getElementById('btn-run-ocr-step2');
+    if (btnRunOcrStep2) {
+      btnRunOcrStep2.addEventListener('click', () => {
+        this.requirePassword(() => this.handleRunAiOcrStep2());
+      });
+    }
+
+    // Nút chuyển văn bản thô sang Tab Nhập Văn Bản
+    const btnCopyRawToTab = document.getElementById('btn-copy-raw-to-text-tab');
+    if (btnCopyRawToTab) {
+      btnCopyRawToTab.addEventListener('click', () => {
+        const rawText = (document.getElementById('ai-ocr-raw-text') ? document.getElementById('ai-ocr-raw-text').value : '').trim();
+        if (!rawText) {
+          this.showToast('Chưa có văn bản thô để chuyển sang Tab Văn bản!', 'warning');
+          return;
+        }
+        const textInput = document.getElementById('ai-input-text');
+        if (textInput) textInput.value = rawText;
+        const textTabBtn = document.getElementById('tab-btn-text-input');
+        if (textTabBtn) textTabBtn.click();
+        this.showToast('Đã chuyển văn bản thô sang Tab Nhập Văn Bản!', 'info');
+      });
+    }
+
+    // Nút xóa nhanh văn bản thô
+    const btnClearRawText = document.getElementById('btn-clear-raw-ocr-text');
+    if (btnClearRawText) {
+      btnClearRawText.addEventListener('click', () => {
+        const rawEl = document.getElementById('ai-ocr-raw-text');
+        if (rawEl) rawEl.value = '';
       });
     }
 
@@ -1488,6 +1531,7 @@ class DisciplineApp {
       const nameEl = document.getElementById('ai-image-name');
       const sizeEl = document.getElementById('ai-image-size');
       const btnRun = document.getElementById('btn-run-ai-vision');
+      const btnStep1 = document.getElementById('btn-run-ocr-step1');
 
       if (previewImg) {
         previewImg.src = this.currentOcrImageBase64;
@@ -1497,8 +1541,9 @@ class DisciplineApp {
       if (sizeEl) sizeEl.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
       if (previewCard) previewCard.classList.remove('hidden');
       if (btnRun) btnRun.disabled = false;
+      if (btnStep1) btnStep1.disabled = false;
 
-      this.showToast('Đã tải ảnh lên thành công. Sẵn sàng quét bằng Vision AI!', 'success');
+      this.showToast('Đã tải ảnh lên thành công. Thầy/Cô có thể bấm "Bước 1" để trích xuất chữ viết tay!', 'success');
     };
     reader.readAsDataURL(file);
   }
@@ -1510,12 +1555,18 @@ class DisciplineApp {
     const previewCard = document.getElementById('ai-image-preview-card');
     const previewImg = document.getElementById('ai-image-preview-element');
     const btnRun = document.getElementById('btn-run-ai-vision');
+    const btnStep1 = document.getElementById('btn-run-ocr-step1');
+    const rawBox = document.getElementById('ai-ocr-raw-step2-box');
+    const rawEl = document.getElementById('ai-ocr-raw-text');
     const fileCam = document.getElementById('ai-input-camera-file');
     const fileInput = document.getElementById('ai-input-image-file');
 
     if (previewCard) previewCard.classList.add('hidden');
     if (previewImg) previewImg.src = '';
     if (btnRun) btnRun.disabled = true;
+    if (btnStep1) btnStep1.disabled = true;
+    if (rawBox) rawBox.classList.add('hidden');
+    if (rawEl) rawEl.value = '';
     if (fileCam) fileCam.value = '';
     if (fileInput) fileInput.value = '';
   }
@@ -1527,6 +1578,95 @@ class DisciplineApp {
     if (previewImg) {
       previewImg.style.transform = `rotate(${this.currentOcrImageRotation}deg)`;
     }
+  }
+
+  // ── Quy trình 2 Bước: Xử lý OCR Chữ Viết Tay Sổ Tay ──────────────────────────
+
+  handleRunAiOcrStep1() {
+    this.requirePassword(() => this.doRunAiOcrStep1());
+  }
+
+  async doRunAiOcrStep1() {
+    if (!this.currentOcrImageBase64) {
+      this.showToast('Vui lòng tải ảnh chụp sổ tay lên trước khi quét!', 'warning');
+      return;
+    }
+
+    const apiKey = window.geminiService ? window.geminiService.getApiKey() : null;
+    if (!apiKey) {
+      this.showToast('Chưa có API Key. Vui lòng cài đặt API Key để sử dụng AI.', 'warning');
+      this.openSettingsModal();
+      return;
+    }
+
+    document.getElementById('global-error-banner').classList.add('hidden');
+    document.getElementById('ai-fallback-log').classList.add('hidden');
+
+    const btnStep1 = document.getElementById('btn-run-ocr-step1');
+    if (btnStep1) {
+      btnStep1.disabled = true;
+      btnStep1.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Đang Trích Xuất...</span>`;
+      if (window.lucide) window.lucide.createIcons();
+    }
+
+    this.updateStepperState('running', 1, 'Mô hình Vision AI đang bóc tách chữ viết tay từ ảnh chụp sổ tay (Bước 1: OCR Thô)...');
+
+    try {
+      const result = await window.geminiService.extractRawTextFromImage({
+        imageBase64: this.currentOcrImageBase64,
+        mimeType: this.currentOcrImageMimeType || 'image/jpeg',
+        onProgress: (status) => {
+          if (status.type === 'fallback') {
+            const fallbackLog = document.getElementById('ai-fallback-log');
+            const fallbackText = document.getElementById('ai-fallback-text');
+            if (fallbackLog && fallbackText) {
+              fallbackLog.classList.remove('hidden');
+              fallbackText.textContent = status.message;
+            }
+          } else if (status.message) {
+            this.updateStepperState('running', 1, status.message);
+          }
+        }
+      });
+
+      const rawTextEl = document.getElementById('ai-ocr-raw-text');
+      const rawBox = document.getElementById('ai-ocr-raw-step2-box');
+
+      if (rawTextEl) {
+        rawTextEl.value = result.rawText || '';
+      }
+      if (rawBox) {
+        rawBox.classList.remove('hidden');
+        rawBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      this.updateStepperState('success', 1, 'Bước 1 hoàn tất! Đã trích xuất xong chữ viết tay. Thầy/Cô có thể chỉnh sửa bên dưới trước khi bấm Bước 2.');
+      this.showToast('Đã trích xuất xong chữ viết tay! Thầy/Cô có thể xem và chỉnh sửa văn bản thô bên dưới.', 'success');
+
+    } catch (err) {
+      console.error('Lỗi trích xuất OCR Bước 1:', err);
+      this.updateStepperState('error', 1, err.message);
+      this.showToast(`Lỗi trích xuất OCR: ${err.message}`, 'error');
+    } finally {
+      if (btnStep1) {
+        btnStep1.disabled = false;
+        btnStep1.innerHTML = `<i data-lucide="scan-text" class="w-4 h-4"></i><span>Bước 1: Trích Xuất Chữ Viết Tay (OCR Thô)</span>`;
+        if (window.lucide) window.lucide.createIcons();
+      }
+    }
+  }
+
+  handleRunAiOcrStep2() {
+    this.requirePassword(() => {
+      const rawTextEl = document.getElementById('ai-ocr-raw-text');
+      const text = rawTextEl ? rawTextEl.value.trim() : '';
+      if (!text) {
+        this.showToast('Văn bản thô đang rỗng. Vui lòng bấm "Bước 1" để trích xuất hoặc nhập nội dung vi phạm!', 'warning');
+        if (rawTextEl) rawTextEl.focus();
+        return;
+      }
+      this.doRunAiParse(text);
+    });
   }
 
   handleRunAiVisionParse() {
@@ -1589,6 +1729,16 @@ class DisciplineApp {
 
       const rawRecords = (response.data && response.data.records) ? response.data.records : [];
 
+      // Cập nhật văn bản thô vào Textarea Bước 2 để giáo viên theo dõi và chỉnh sửa trực quan
+      const rawTextEl = document.getElementById('ai-ocr-raw-text');
+      const rawBox = document.getElementById('ai-ocr-raw-step2-box');
+      if (rawTextEl && rawRecords.length > 0) {
+        rawTextEl.value = rawRecords.map(r => `${r.date || dateVal} - ${r.student_name || ''} - ${r.class_name || ''} - ${r.original_text || r.violation_category || ''}`).join('\n');
+      }
+      if (rawBox) {
+        rawBox.classList.remove('hidden');
+      }
+
       // Step 2: Tách dòng Đa ngày
       this.updateStepperState('running', 2, 'Kiểm tra và tự động tách dòng độc lập theo từng ngày vi phạm...');
       await this.sleep(250);
@@ -1638,11 +1788,14 @@ class DisciplineApp {
     this.requirePassword(() => this.doRunAiParse());
   }
 
-  async doRunAiParse() {
-    const rawText = (document.getElementById('ai-input-text').value || '').trim();
+  async doRunAiParse(customRawText = null) {
+    const rawText = customRawText !== null
+      ? customRawText.trim()
+      : (document.getElementById('ai-input-text').value || '').trim();
     if (!rawText) {
-      this.showToast('Vui lòng nhập nội dung mô tả vi phạm trước khi phân tích.', 'warning');
-      document.getElementById('ai-input-text').focus();
+      this.showToast('Vui lòng nhập hoặc bóc tách nội dung mô tả vi phạm trước khi phân tích.', 'warning');
+      const textEl = document.getElementById('ai-input-text');
+      if (textEl) textEl.focus();
       return;
     }
 
@@ -1666,8 +1819,17 @@ class DisciplineApp {
     document.getElementById('ai-fallback-log').classList.add('hidden');
 
     const btnRun = document.getElementById('btn-run-ai-parse');
-    btnRun.disabled = true;
-    btnRun.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Đang Phân Tích...</span>`;
+    if (btnRun) {
+      btnRun.disabled = true;
+      btnRun.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Đang Phân Tích...</span>`;
+    }
+
+    const btnRunStep2 = document.getElementById('btn-run-ocr-step2');
+    if (btnRunStep2) {
+      btnRunStep2.disabled = true;
+      btnRunStep2.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Đang Chuẩn Hóa & Đẩy Dữ Liệu...</span>`;
+    }
+
     if (window.lucide) window.lucide.createIcons();
 
     try {
@@ -1732,8 +1894,14 @@ class DisciplineApp {
         bannerMsg.textContent = err.message || 'Lỗi không xác định khi kết nối API';
       }
     } finally {
-      btnRun.disabled = false;
-      btnRun.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i><span>Bắt Đầu Chuẩn Hóa Bằng AI</span>`;
+      if (btnRun) {
+        btnRun.disabled = false;
+        btnRun.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i><span>Bắt Đầu Chuẩn Hóa Bằng AI</span>`;
+      }
+      if (btnRunStep2) {
+        btnRunStep2.disabled = false;
+        btnRunStep2.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i><span>Bước 2: Bắt Đầu Chuẩn Hóa & Đẩy Dữ Liệu</span>`;
+      }
       if (window.lucide) window.lucide.createIcons();
     }
   }
@@ -6501,18 +6669,18 @@ class DisciplineApp {
         localStorage.removeItem(k);
       });
 
-      // 2. Nếu key dshs_cloud_url chứa kvdb.io hoặc link không hợp lệ -> xóa ngay
+      // 2. Nếu key dshs_cloud_url chứa link cũ lệch -> xóa ngay và lưu link chuẩn
       const cloudUrl = localStorage.getItem('dshs_cloud_url');
-      if (cloudUrl && (cloudUrl.includes('kvdb.io') || !cloudUrl.includes('script.google.com'))) {
-        console.log('🧹 Purging invalid dshs_cloud_url:', cloudUrl);
+      if (cloudUrl && (cloudUrl.includes('kvdb.io') || !cloudUrl.includes('script.google.com') || cloudUrl !== OFFICIAL_GAS_ENDPOINT)) {
+        console.log('🧹 Purging obsolete dshs_cloud_url:', cloudUrl);
         localStorage.removeItem('dshs_cloud_url');
       }
+      localStorage.setItem('dshs_cloud_url', OFFICIAL_GAS_ENDPOINT);
 
       // 3. Nếu phiên bản lưu trữ chưa được nâng cấp lên 2.3.0_GAS_STANDARD:
       // Buộc xóa sạch dshs_cloud_url cũ để ép dùng Endpoint chuẩn
       if (savedVer !== CURRENT_STORAGE_VER) {
         console.log('🔄 Nâng cấp bộ nhớ đệm hệ thống lên phiên bản:', CURRENT_STORAGE_VER);
-        localStorage.removeItem('dshs_cloud_url');
         localStorage.removeItem('dshs_cloud_url_updated_at');
         localStorage.setItem('dshs_storage_version', CURRENT_STORAGE_VER);
       }
@@ -6529,25 +6697,10 @@ class DisciplineApp {
   }
 
   getCloudUrl() {
-    // 1. Kiểm tra cache tùy chỉnh trong localStorage
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const customUrl = localStorage.getItem('dshs_cloud_url');
-        if (customUrl) {
-          // Nếu dính kvdb.io hoặc không phải script.google.com -> lập tức xóa bỏ
-          if (customUrl.includes('kvdb.io') || !customUrl.includes('script.google.com')) {
-            localStorage.removeItem('dshs_cloud_url');
-          } else if (this.isAdmin()) {
-            // Chỉ tài khoản Admin cấp cao mới được phép dùng URL tùy chỉnh hợp lệ
-            return customUrl.trim();
-          }
-        }
-      }
-    } catch (e) {}
-
-    // 2. Mặc định trên toàn bộ thiết bị (Điện thoại, Máy tính bảng, Máy tính - Khách xem, Giám thị lhp38, Admin 2806):
-    // Luôn luôn tự động dùng đường dẫn chuẩn định cứng trong mã nguồn mà không bị kẹt link cũ
-    return this.DEFAULT_CLOUD_URL;
+    // Đóng cứng (hardcode) tuyệt đối Endpoint Google Apps Script chuẩn của nhà trường
+    // Áp dụng mặc định toàn cục trên mọi thiết bị (Điện thoại, Máy tính bảng, Máy tính - Khách xem, Giám thị lhp38, Admin 2806)
+    // Hoàn toàn không phụ thuộc vào localStorage cũ và không bao giờ bị kẹt link cũ hay ngoại tuyến
+    return OFFICIAL_GAS_ENDPOINT;
   }
 
   async setCloudUrl(url, broadcast = false) {

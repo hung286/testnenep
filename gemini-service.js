@@ -530,6 +530,63 @@ ${chunkText}
   }
 
   /**
+   * BƯỚC 1 (CỤC BỘ / TRÍCH XUẤT THÔ):
+   * Trích xuất văn bản thô từ ảnh chụp sổ tay ghi chép chữ viết tay
+   * Trả về chuỗi văn bản sạch để người dùng xem lại và chỉnh sửa trực quan trên màn hình cảm ứng
+   */
+  async extractRawTextFromImage({ imageBase64, mimeType = 'image/jpeg', onProgress = () => {} }) {
+    let cleanBase64 = imageBase64;
+    if (cleanBase64.includes('base64,')) {
+      cleanBase64 = cleanBase64.split('base64,')[1];
+    }
+
+    const systemInstruction = `
+Bạn là chuyên gia OCR bóc tách chữ viết tay từ ảnh chụp sổ tay theo dõi nề nếp / sổ trực cờ đỏ của Trường THPT Số 1 Lê Hồng Phong.
+Nhiệm vụ BƯỚC 1: Đọc kỹ chữ viết tay và trích xuất danh sách các dòng văn bản thô ghi trong sổ để giáo viên xem lại và chỉnh sửa trực quan.
+
+ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (JSON):
+{
+  "raw_lines": [
+    "Dòng 1: [Ngày nếu có] - [Họ tên] - [Lớp] - [Nội dung vi phạm]",
+    "Dòng 2: [Ngày nếu có] - [Họ tên] - [Lớp] - [Nội dung vi phạm]"
+  ],
+  "full_text": "Văn bản thô đầy đủ, mỗi vi phạm trên một dòng độc lập"
+}
+`.trim();
+
+    const prompt = 'Hãy đọc toàn bộ chữ viết tay trong ảnh sổ tay này và trích xuất thành danh sách các dòng văn bản thô:';
+
+    onProgress({
+      type: 'raw_ocr_start',
+      message: 'Mô hình Vision AI đang bóc tách văn bản thô từ ảnh sổ tay...'
+    });
+
+    const response = await this.callWithFallback({
+      systemInstruction,
+      prompt,
+      inlineData: {
+        mimeType: mimeType || 'image/jpeg',
+        data: cleanBase64
+      },
+      onStatusUpdate: onProgress
+    });
+
+    let fullText = '';
+    if (response.data && response.data.full_text) {
+      fullText = response.data.full_text.trim();
+    } else if (response.data && Array.isArray(response.data.raw_lines)) {
+      fullText = response.data.raw_lines.join('\n').trim();
+    } else if (response.data && Array.isArray(response.data.records)) {
+      fullText = response.data.records.map(r => `${r.date || ''} - ${r.student_name || ''} - ${r.class_name || ''} - ${r.original_text || r.violation_category || ''}`.trim()).join('\n');
+    }
+
+    return {
+      rawText: fullText,
+      usedModel: response.usedModel
+    };
+  }
+
+  /**
    * Phân tích ảnh chụp sổ tay vi phạm bằng Vision AI (OCR Chữ viết tay)
    */
   async parseHandwrittenImage({ imageBase64, mimeType = 'image/jpeg', inputDate, weekNum, activeRules, onProgress = () => {} }) {

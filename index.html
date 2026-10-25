@@ -355,10 +355,55 @@
                   <span class="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">Gemini Multimodal Vision AI</span>
                 </div>
 
-                <button id="btn-run-ai-vision" disabled class="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition shadow-md shadow-indigo-500/25 cursor-pointer">
-                  <i data-lucide="scan" class="w-4 h-4"></i>
-                  <span>Quét & Bóc Tách Chữ Viết Tay Bằng Vision AI</span>
-                </button>
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                  <button id="btn-run-ocr-step1" disabled class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition shadow-md shadow-indigo-500/25 cursor-pointer">
+                    <i data-lucide="scan-text" class="w-4 h-4"></i>
+                    <span>Bước 1: Trích Xuất Chữ Viết Tay (OCR Thô)</span>
+                  </button>
+                  <button id="btn-run-ai-vision" disabled class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold rounded-xl transition cursor-pointer">
+                    <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                    <span>Quét & Chuẩn Hóa Ngay (1 Chạm)</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- STEP 2 INTERACTIVE CONTAINER: RAW TEXT REVIEW & TOUCH EDITING -->
+              <div id="ai-ocr-raw-step2-box" class="hidden bg-gradient-to-br from-indigo-50/70 via-white to-blue-50/70 border-2 border-indigo-300 rounded-2xl p-4 sm:p-5 space-y-3.5 shadow-sm transition-all duration-300">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-3">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-extrabold text-xs shadow-sm">2</span>
+                    <div>
+                      <h5 class="text-xs font-bold text-slate-900 uppercase tracking-wide">Bước 2: Kiểm Tra & Chỉnh Sửa Văn Bản Thô</h5>
+                      <p class="text-[11px] text-slate-500">Chỉnh sửa nhanh trên màn hình cảm ứng điện thoại hoặc máy tính trước khi chuẩn hóa & đẩy lên Cloud</p>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" id="btn-copy-raw-to-text-tab" class="text-[11px] font-semibold text-indigo-700 bg-indigo-100/70 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition flex items-center gap-1 cursor-pointer" title="Sao chép sang Tab nhập văn bản tự do">
+                      <i data-lucide="arrow-right-left" class="w-3.5 h-3.5"></i>
+                      <span>Chuyển sang Tab Văn bản</span>
+                    </button>
+                    <button type="button" id="btn-clear-raw-ocr-text" class="text-[11px] font-semibold text-slate-500 hover:text-red-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer" title="Xóa nội dung này">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Touch-friendly Textarea for raw handwritten text -->
+                <div>
+                  <textarea id="ai-ocr-raw-text" rows="6" class="w-full text-xs sm:text-sm font-mono p-3.5 rounded-xl border border-indigo-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 bg-white text-slate-800 placeholder-slate-400 transition leading-relaxed resize-y" placeholder="Văn bản bóc tách từ ảnh sổ tay sẽ xuất hiện ở đây. Thầy/Cô có thể chạm vào để chỉnh sửa nhanh nếu chữ viết tay bị mờ hoặc viết tắt..."></textarea>
+                </div>
+
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                  <div class="text-[11px] text-indigo-800 flex items-center gap-1.5 font-medium">
+                    <i data-lucide="info" class="w-4 h-4 text-indigo-500 shrink-0"></i>
+                    <span>Tự động tách ngày, quy đổi lỗi Áo khoác / Áo đoàn và đối chiếu CSDL 1.226 học sinh ở bước này.</span>
+                  </div>
+
+                  <button type="button" id="btn-run-ocr-step2" class="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold rounded-xl transition shadow-md shadow-emerald-500/25 cursor-pointer">
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    <span>Bước 2: Bắt Đầu Chuẩn Hóa & Đẩy Dữ Liệu</span>
+                  </button>
+                </div>
               </div>
             </div>
 
