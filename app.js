@@ -4073,6 +4073,7 @@ class DisciplineApp {
         return `
           <input type="number" step="${step}" min="0" value="${val}"
                  data-class="${r.className}" data-field="${field}"
+                 oninput="window.app.handleInlineEmulationChange(${selectedWeek}, '${r.className}', '${field}', this.value)"
                  onchange="window.app.handleInlineEmulationChange(${selectedWeek}, '${r.className}', '${field}', this.value)"
                  onkeydown="window.app.handleInlineTableKeydown(event, this)"
                  class="table-num-input">
@@ -4259,6 +4260,12 @@ class DisciplineApp {
     if (e.key === 'Enter') {
       e.preventDefault();
       const currentField = input.dataset.field;
+      const targetClass = input.dataset.class;
+      const emuSelect = document.getElementById('emulation-select-week');
+      const w = emuSelect ? parseInt(emuSelect.value, 10) || this.currentWeek : this.currentWeek;
+      if (targetClass && currentField) {
+        this.handleInlineEmulationChange(w, targetClass, currentField, input.value);
+      }
       const allInputs = Array.from(document.querySelectorAll(`.table-num-input[data-field="${currentField}"]`));
       const currentIndex = allInputs.indexOf(input);
       if (currentIndex !== -1) {
@@ -5396,7 +5403,7 @@ class DisciplineApp {
 
     // 2. Quét Header đa tầng (hỗ trợ cả header 1 dòng, 2 dòng gộp như Báo cáo tuần)
     let colClass = -1, colGvcn = -1, colShl = -1, colTot = -1, colA = -1, colB = -1, colC = -1, colD = -1;
-    let colDiem15 = -1, colVang = -1, colBonus = -1, colNote = -1;
+    let colDiem15 = -1, colVang = -1, colBonus = -1, colNote = -1, colTbChung = -1;
 
     for (let c = 0; c < maxCols; c++) {
       const colTexts = headerRows.map(r => cleanStr(r[c])).filter(Boolean);
@@ -5435,6 +5442,9 @@ class DisciplineApp {
       if (colNote === -1 && (combined.includes('ghichu') || combined.includes('note') || combined.includes('lydo'))) {
         colNote = c;
       }
+      if (colTbChung === -1 && (combined.includes('tbchung') || combined.includes('trungbinhchung') || combined.includes('tb chung'))) {
+        colTbChung = c;
+      }
     }
 
     // Heuristics chuẩn hoá cho file Báo cáo Tuần (GVCN 2 cột Họ & Tên)
@@ -5455,9 +5465,11 @@ class DisciplineApp {
     if (colDiem15 === -1) colDiem15 = (maxCols >= 20) ? 13 : 9;
     if (colVang === -1) colVang = (maxCols >= 20) ? 17 : 10;
     if (colBonus === -1 && maxCols < 20) colBonus = 11;
+    if (colTbChung === -1 && maxCols >= 20) colTbChung = 19;
 
     const parsedClasses = {};
     const parsedBonuses = [];
+    const notesBelowTable = [];
     let totalLessons = 0;
     let totalAbsences = 0;
 
@@ -5479,6 +5491,15 @@ class DisciplineApp {
       const row = rows[rIdx];
       if (!Array.isArray(row)) continue;
 
+      const rowStr = row.map(c => String(c || '').trim()).filter(Boolean).join(' ');
+      const cleanRow = cleanStr(rowStr);
+
+      // Nhận diện dòng ghi chú / tổng kết / thống kê dưới bảng
+      if (cleanRow.includes('tonghopchung') || cleanRow.includes('ghichu') || cleanRow.includes('thongke') || cleanRow.includes('noidung') || cleanRow.includes('congtri') || cleanRow.includes('tonghocsinhvang')) {
+        notesBelowTable.push(rowStr);
+        continue;
+      }
+
       let matchedClass = null;
 
       // Thử vị trí colClass
@@ -5487,27 +5508,37 @@ class DisciplineApp {
         matchedClass = defaultClasses.find(c => c.class === norm);
       }
 
-      // Thử các ô khác trong 5 cột đầu
+      // Thử các ô khác trong 5 cột đầu (nếu ô đó chỉ chứa riêng mã lớp)
       if (!matchedClass) {
         for (let c = 0; c < Math.min(row.length, 5); c++) {
-          const norm = this.normalizeClassName(String(row[c] || '').trim());
-          matchedClass = defaultClasses.find(c => c.class === norm);
-          if (matchedClass) break;
+          const cellVal = String(row[c] || '').trim();
+          const norm = this.normalizeClassName(cellVal);
+          if (cellVal.length <= 7 && defaultClasses.some(cls => cls.class === norm)) {
+            matchedClass = defaultClasses.find(cls => cls.class === norm);
+            if (matchedClass) break;
+          }
         }
       }
 
-      // Thử regex trong cả dòng nếu là PDF tokenized line
+      // Nếu không tìm thấy, chỉ thử regex khi dòng có đủ số liệu thi đua (ít nhất 4 ô có số)
       if (!matchedClass) {
-        const lineStr = row.join(' ');
-        const m = lineStr.match(/\b(10B0?[1-9]|10B1[0-1]|11A0?[1-9]|12C0?[1-9])\b/i);
-        if (m) {
-          const norm = this.normalizeClassName(m[1]);
-          matchedClass = defaultClasses.find(c => c.class === norm);
+        const numCount = row.filter(cell => cell !== '' && cell !== null && cell !== undefined && !isNaN(parseFloat(String(cell).trim().replace(',', '.')))).length;
+        if (numCount >= 4) {
+          const m = rowStr.match(/\b(10B0?[1-9]|10B1[0-1]|11A0?[1-9]|12C0?[1-9])\b/i);
+          if (m) {
+            const norm = this.normalizeClassName(m[1]);
+            matchedClass = defaultClasses.find(c => c.class === norm);
+          }
         }
       }
 
       if (matchedClass) {
         const cName = matchedClass.class;
+
+        // TUYỆT ĐỐI KHÔNG GHI ĐÈ nếu lớp này đã được đọc từ dòng dữ liệu trước
+        if (parsedClasses[cName]) {
+          continue;
+        }
 
         const shl = colShl !== -1 ? parseNum(row[colShl], 0) : 0;
         const tot = colTot !== -1 ? parsePositiveInt(row[colTot], 0) : 0;
@@ -5517,7 +5548,7 @@ class DisciplineApp {
         const gioD = colD !== -1 ? parsePositiveInt(row[colD], 0) : 0;
         const diem15 = colDiem15 !== -1 ? Math.min(10.0, Math.max(0, parseNum(row[colDiem15], 10.0))) : 10.0;
         const hsVang = colVang !== -1 ? parsePositiveInt(row[colVang], 0) : 0;
-        const bonus = colBonus !== -1 ? parseNum(row[colBonus], 0) : 0;
+        let bonus = colBonus !== -1 ? parseNum(row[colBonus], 0) : 0;
         const note = colNote !== -1 ? String(row[colNote] || '').trim() : '';
 
         const tongTiet = tot + gioA + gioB + gioC + gioD;
@@ -5529,7 +5560,17 @@ class DisciplineApp {
         const existingClass = (existingWeek && existingWeek.classes && existingWeek.classes[cName]) || {};
         const diemTru = existingClass.diemTru || 0;
         const tbNenNep = diem15 - diemTru;
-        const tbChung = ((diemTbHocTap + tbNenNep) / 2) + bonus;
+
+        // Tự động nhận diện điểm cộng nếu cột TB Chung trong file cao hơn ((TB HT + TB NN)/2)
+        const expectedTbChung = (diemTbHocTap + tbNenNep) / 2;
+        if (colTbChung !== -1) {
+          const fileTbChung = parseNum(row[colTbChung], 0);
+          if (fileTbChung > expectedTbChung + 0.05 && bonus === 0) {
+            bonus = Math.round((fileTbChung - expectedTbChung) * 10) / 10;
+          }
+        }
+
+        const tbChung = expectedTbChung + bonus;
 
         let xepLoai = 'Kém';
         if (tbChung >= 9.9) xepLoai = 'X sắc';
@@ -5567,6 +5608,15 @@ class DisciplineApp {
         }
       }
     }
+
+    // Bổ sung lý do cho điểm thưởng từ các dòng ghi chú dưới bảng
+    notesBelowTable.forEach(nStr => {
+      parsedBonuses.forEach(b => {
+        if (nStr.includes(b.className)) {
+          b.reason = nStr.replace(/^(TT|Nội dung|Ghi chú:?|\s|\|)+/i, '').trim();
+        }
+      });
+    });
 
     const classCount = Object.keys(parsedClasses).length;
     if (classCount === 0) {
