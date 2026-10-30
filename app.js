@@ -110,7 +110,7 @@ class DisciplineApp {
   }
 
   getStudentGender(name, className) {
-    if (!name) return 'Nam';
+    if (!name || name === '[Tập thể lớp]' || String(name).toLowerCase().includes('tập thể')) return 'Tập thể';
     const students = this.students || window.DEFAULT_STUDENTS || [];
     const s = students.find(x => 
       (x.name && x.name.toLowerCase() === name.toLowerCase()) && 
@@ -1986,6 +1986,7 @@ class DisciplineApp {
         student_id: finalStudentId,
         student_name: finalName,
         class_name: finalClass,
+        is_collective: !!matchResult.isCollective,
         matched_student: isMatched,
         ambiguous: isAmbiguous,
         ambiguity_reason: ambiguityReason,
@@ -2406,8 +2407,10 @@ class DisciplineApp {
   }
 
   matchStudentSmart(rawName, rawClass) {
-    if (!rawName) return { matched: false, notFound: true, candidates: [] };
     const targetClass = this.normalizeClassName(rawClass);
+    if (!rawName || rawName === '[Tập thể lớp]' || String(rawName).toLowerCase().includes('tập thể') || String(rawName).toLowerCase().includes('cả lớp')) {
+      return { matched: true, isCollective: true, status: 'collective', student: { name: '[Tập thể lớp]', class: targetClass } };
+    }
     const cleanName = String(rawName).trim()
       .replace(/^(?:học\s*sinh|bạn|em)\s+/i, '')
       .replace(/\s*-\s*l[ớơo]p.*$/i, '')
@@ -2789,6 +2792,14 @@ class DisciplineApp {
       ruleAutoList.addEventListener('click', selectRuleByIndex);
     }
 
+    // Khởi tạo danh sách lớp cho dropdown Lỗi tập thể
+    const collectiveClassSelect = document.getElementById('manual-collective-class-select');
+    if (collectiveClassSelect) {
+      const defaultClasses = window.DEFAULT_CLASSES || [];
+      collectiveClassSelect.innerHTML = `<option value="">-- Bấm chọn lớp vi phạm (10B01 - 12C09) --</option>` +
+        defaultClasses.map(c => `<option value="${c.class}">Lớp ${c.class} (GVCN: ${c.gvcn})</option>`).join('');
+    }
+
     // Đóng dropdown khi click ngoài
     document.addEventListener('click', (e) => {
       if (studentInput && autoList && !studentInput.contains(e.target) && !autoList.contains(e.target)) {
@@ -2808,6 +2819,10 @@ class DisciplineApp {
       btnAdd.onclick = (e) => {
         e.preventDefault();
         this.requirePassword(() => {
+          const chkCollective = document.getElementById('chk-collective-violation');
+          const isCollectiveChecked = chkCollective && chkCollective.checked;
+          const collectiveClassSelect = document.getElementById('manual-collective-class-select');
+
           const studentVal = (studentInput ? studentInput.value : '').trim();
           let selectedRule = ruleInput ? (ruleInput.dataset.ruleName || ruleInput.value.trim()) : '';
           let points = ruleInput && ruleInput.dataset.rulePoints ? parseFloat(ruleInput.dataset.rulePoints) : NaN;
@@ -2823,32 +2838,61 @@ class DisciplineApp {
             points = matched ? matched.points : 0.5;
           }
 
-          if (!studentVal) {
-            this.showToast('Vui lòng nhập tên hoặc chọn học sinh.', 'warning');
-            if (studentInput) studentInput.focus();
-            return;
-          }
           if (!selectedRule) {
             this.showToast('Vui lòng chọn hoặc nhập lỗi vi phạm.', 'warning');
             if (ruleInput) ruleInput.focus();
             return;
           }
 
-          let name = studentInput ? (studentInput.dataset.studentName || '') : '';
-          let className = studentInput ? (studentInput.dataset.studentClass || '') : '';
+          let name = '';
+          let className = '';
+          let isCollective = isCollectiveChecked;
 
-          if (!name) {
-            const match = studentVal.match(/^(.*?)(?:[\s\-\–\—\(\/]+(?:[Ll][ớơo]p\s*)?([0-9]{1,2}[A-Za-z0-9]+)\)?)$/i);
-            if (match) {
-              name = match[1].replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
-              className = this.normalizeClassName(match[2]);
+          if (isCollectiveChecked) {
+            className = collectiveClassSelect ? collectiveClassSelect.value : '';
+            if (!className && studentVal) {
+              className = this.normalizeClassName(studentVal);
+            }
+            if (!className) {
+              this.showToast('Vui lòng chọn lớp vi phạm cho lỗi tập thể!', 'warning');
+              if (collectiveClassSelect) collectiveClassSelect.focus();
+              return;
+            }
+            name = '[Tập thể lớp]';
+          } else {
+            if (!studentVal) {
+              this.showToast('Vui lòng nhập tên học sinh hoặc lớp vi phạm.', 'warning');
+              if (studentInput) studentInput.focus();
+              return;
+            }
+
+            // Kiểm tra xem người dùng có gõ chỉ tên lớp hay không (Ví dụ: "10B01", "Lớp 10B01", "Tập thể 10B01")
+            const cleanInput = studentVal.trim();
+            const directClassNorm = this.normalizeClassName(cleanInput);
+            const isJustClass = (window.DEFAULT_CLASSES || []).some(c => c.class === directClassNorm);
+            const isExplicitCollective = /^(tập thể|cả lớp|lớp)\b/i.test(cleanInput);
+
+            if (isJustClass || (isExplicitCollective && directClassNorm)) {
+              isCollective = true;
+              name = '[Tập thể lớp]';
+              className = directClassNorm;
             } else {
-              name = studentVal.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
-              className = 'Chưa rõ';
+              name = studentInput ? (studentInput.dataset.studentName || '') : '';
+              className = studentInput ? (studentInput.dataset.studentClass || '') : '';
+
+              if (!name) {
+                const match = studentVal.match(/^(.*?)(?:[\s\-\–\—\(\/]+(?:[Ll][ớơo]p\s*)?([0-9]{1,2}[A-Za-z0-9]+)\)?)$/i);
+                if (match) {
+                  name = match[1].replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
+                  className = this.normalizeClassName(match[2]);
+                } else {
+                  name = studentVal.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
+                  className = 'Chưa rõ';
+                }
+              }
+              name = name.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
             }
           }
-
-          name = name.replace(/[\s\-\–\—]*(?:[Ll][ớơo]p)?\s*$/i, '').trim();
 
           const dateVal = document.getElementById('input-violation-date').value || new Date().toISOString().split('T')[0];
           const week = this.calculateWeek(dateVal);
@@ -2863,13 +2907,15 @@ class DisciplineApp {
             created_at: now.toISOString(),
             student_name: name,
             class_name: className,
+            is_collective: isCollective,
+            gender: isCollective ? 'Tập thể' : this.getStudentGender(name, className),
             violation_category: selectedRule,
             penalty_points: points,
-            original_note: 'Nhập thủ công trực tiếp'
+            original_note: isCollective ? 'Vi phạm tập thể lớp' : 'Nhập thủ công trực tiếp'
           });
 
           // Ghi nhận Audit Log
-          this.logAuditAction('ADD_VIOLATION', 'Thêm vi phạm', `Đã ghi nhận vi phạm: ${name} (${className}) - ${selectedRule} (-${points}đ) - Tuần ${week}`, { week, className, student: name, points });
+          this.logAuditAction('ADD_VIOLATION', 'Thêm vi phạm', `Đã ghi nhận vi phạm: ${name} (${className}) - ${selectedRule} (-${points}đ) - Tuần ${week}`, { week, className, student: name, points, isCollective });
 
           // Tự động đồng bộ và tính toán lại Bảng thi đua thời gian thực
           this.syncViolationWithEmulation(week, className);
@@ -2889,9 +2935,61 @@ class DisciplineApp {
 
           this.renderLogsTable();
           this.renderEmulationTable();
-          this.showToast(`Đã ghi nhận vi phạm: ${name} - ${className}!`, 'success');
+          const toastMsg = isCollective ? `Đã ghi nhận vi phạm tập thể lớp ${className}!` : `Đã ghi nhận vi phạm: ${name} - ${className}!`;
+          this.showToast(toastMsg, 'success');
         });
       };
+    }
+  }
+
+  toggleCollectiveViolation(isCollective) {
+    const studentContainer = document.getElementById('container-student-input');
+    const collectiveContainer = document.getElementById('container-collective-class-select');
+    const labelStudent = document.getElementById('label-manual-student');
+    const autoList = document.getElementById('autocomplete-list');
+    const collectiveClassSelect = document.getElementById('manual-collective-class-select');
+
+    if (autoList) {
+      autoList.classList.add('hidden');
+      autoList.style.display = 'none';
+    }
+
+    if (isCollective) {
+      if (studentContainer) studentContainer.classList.add('hidden');
+      if (collectiveContainer) {
+        collectiveContainer.classList.remove('hidden');
+        if (collectiveClassSelect) collectiveClassSelect.focus();
+      }
+      if (labelStudent) labelStudent.textContent = '1. Chọn Lớp vi phạm (Lỗi tập thể cả lớp):';
+    } else {
+      if (studentContainer) {
+        studentContainer.classList.remove('hidden');
+        const studentInput = document.getElementById('manual-student-input');
+        if (studentInput) studentInput.focus();
+      }
+      if (collectiveContainer) collectiveContainer.classList.add('hidden');
+      if (labelStudent) labelStudent.textContent = '1. Tìm học sinh (gõ tên hoặc lớp):';
+    }
+  }
+
+  toggleEditCollective(isCollective) {
+    const studentInput = document.getElementById('edit-viol-student');
+    const genderSelect = document.getElementById('edit-viol-gender');
+    if (isCollective) {
+      if (studentInput) {
+        studentInput.value = '[Tập thể lớp]';
+        studentInput.setAttribute('readonly', 'true');
+        studentInput.classList.add('bg-slate-100');
+      }
+      if (genderSelect) genderSelect.value = 'Tập thể';
+    } else {
+      if (studentInput) {
+        if (studentInput.value === '[Tập thể lớp]') studentInput.value = '';
+        studentInput.removeAttribute('readonly');
+        studentInput.classList.remove('bg-slate-100');
+        studentInput.focus();
+      }
+      if (genderSelect && genderSelect.value === 'Tập thể') genderSelect.value = 'Nam';
     }
   }
 
@@ -2975,10 +3073,17 @@ class DisciplineApp {
         </div>
       `;
 
-      const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
-      const genderBadge = gender === 'Nữ'
-        ? `<span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full text-xs font-semibold">Nữ</span>`
-        : `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-semibold">Nam</span>`;
+      const isCollective = v.is_collective || v.student_name === '[Tập thể lớp]' || (v.student_name && String(v.student_name).toLowerCase().includes('tập thể'));
+      const studentDisplay = isCollective
+        ? `<span class="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded text-xs"><i data-lucide="users" class="w-3.5 h-3.5 text-amber-600"></i> [Tập thể lớp]</span>`
+        : `<span class="font-bold text-slate-900">${v.student_name}</span>`;
+
+      const gender = isCollective ? 'Tập thể' : (v.gender || this.getStudentGender(v.student_name, v.class_name));
+      const genderBadge = isCollective
+        ? `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full text-xs font-semibold">Tập thể</span>`
+        : (gender === 'Nữ'
+            ? `<span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded-full text-xs font-semibold">Nữ</span>`
+            : `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-semibold">Nam</span>`);
 
       return `
         <tr class="hover:bg-slate-50 transition border-b border-slate-100">
@@ -2986,7 +3091,7 @@ class DisciplineApp {
           <td class="text-center">
             <span class="font-bold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded text-xs border border-slate-200">${v.class_name}</span>
           </td>
-          <td class="font-bold text-slate-900">${v.student_name}</td>
+          <td>${studentDisplay}</td>
           <td class="text-center">${genderBadge}</td>
           <td class="text-center font-medium text-slate-700 text-xs cursor-pointer group hover:bg-indigo-50/50 transition"
               onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
@@ -3127,6 +3232,13 @@ class DisciplineApp {
       if (editId) editId.value = v.id;
       if (editStudent) editStudent.value = v.student_name || '';
 
+      const isCol = v.is_collective || v.student_name === '[Tập thể lớp]' || (v.student_name && String(v.student_name).toLowerCase().includes('tập thể'));
+      const chkCol = document.getElementById('edit-viol-is-collective');
+      if (chkCol) {
+        chkCol.checked = !!isCol;
+        this.toggleEditCollective(isCol);
+      }
+
       if (editClass) {
         const classes = (window.DEFAULT_CLASSES || []).map(c => c.class);
         editClass.innerHTML = classes.map(c => `<option value="${c}" ${c === v.class_name ? 'selected' : ''}>${c}</option>`).join('');
@@ -3208,10 +3320,14 @@ class DisciplineApp {
     }
 
     // Cập nhật bản ghi
+    const chkCol = document.getElementById('edit-viol-is-collective');
+    const isCol = (chkCol && chkCol.checked) || newStudent === '[Tập thể lớp]';
+
     const now = new Date();
-    v.student_name = newStudent;
+    v.student_name = isCol ? '[Tập thể lớp]' : newStudent;
     v.class_name = newClass;
-    v.gender = newGender;
+    v.is_collective = !!isCol;
+    v.gender = isCol ? 'Tập thể' : newGender;
     v.date = newDate;
     v.week = newWeek;
     v.violation_category = newCategory;
@@ -3298,7 +3414,9 @@ class DisciplineApp {
     const popover = document.getElementById('violation-tooltip-popover');
     if (!popover) return;
 
-    const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
+    const isCollective = v.is_collective || v.student_name === '[Tập thể lớp]' || (v.student_name && String(v.student_name).toLowerCase().includes('tập thể'));
+    const displayName = isCollective ? 'Tập thể lớp' : (v.student_name || 'Học sinh');
+    const gender = isCollective ? 'Tập thể' : (v.gender || this.getStudentGender(v.student_name, v.class_name));
     const dateFormatted = this.formatDate(v.date);
     const timeFormatted = this.formatViolationTime(v);
     const noteContent = (v.original_note && v.original_note.trim()) ? v.original_note.trim() : 'Không có ghi chú thêm.';
@@ -3306,11 +3424,11 @@ class DisciplineApp {
     popover.innerHTML = `
       <div class="flex items-start justify-between gap-3 pb-2.5 border-b border-slate-100">
         <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+          <div class="w-7 h-7 rounded-lg ${isCollective ? 'bg-amber-100 text-amber-700' : 'bg-rose-50 text-rose-600'} flex items-center justify-center font-bold">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           </div>
           <div>
-            <div class="font-bold text-slate-900 text-xs">${v.student_name || 'Học sinh'}</div>
+            <div class="font-bold text-slate-900 text-xs">${displayName}</div>
             <div class="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
               <span class="font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200/60">Lớp ${v.class_name}</span>
               <span>•</span>
@@ -4375,10 +4493,17 @@ class DisciplineApp {
         const canAction = isAuth;
 
         tbody.innerHTML = viols.map((v, i) => {
-          const gender = v.gender || this.getStudentGender(v.student_name, v.class_name);
-          const genderBadge = gender === 'Nữ'
-            ? `<span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nữ</span>`
-            : `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nam</span>`;
+          const isCollective = v.is_collective || v.student_name === '[Tập thể lớp]' || (v.student_name && String(v.student_name).toLowerCase().includes('tập thể'));
+          const studentDisplay = isCollective
+            ? `<span class="inline-flex items-center gap-1 font-bold text-amber-800 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded text-xs"><i data-lucide="users" class="w-3 h-3 text-amber-600"></i> [Tập thể lớp]</span>`
+            : `<span class="font-bold text-slate-900">${v.student_name}</span>`;
+
+          const gender = isCollective ? 'Tập thể' : (v.gender || this.getStudentGender(v.student_name, v.class_name));
+          const genderBadge = isCollective
+            ? `<span class="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-semibold">Tập thể</span>`
+            : (gender === 'Nữ'
+                ? `<span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nữ</span>`
+                : `<span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-semibold">Nam</span>`);
           
           const actCol = `
             <div class="flex items-center justify-center gap-1">
@@ -4397,7 +4522,7 @@ class DisciplineApp {
               <td class="p-2.5 text-center">
                 <span class="font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-xs">${v.class_name}</span>
               </td>
-              <td class="p-2.5 font-bold text-slate-900">${v.student_name}</td>
+              <td class="p-2.5">${studentDisplay}</td>
               <td class="p-2.5 text-center">${genderBadge}</td>
               <td class="p-2.5 text-center text-slate-600 text-xs cursor-pointer group hover:bg-indigo-50/50 transition"
                   onmouseenter="window.app.showViolationTooltip(event, '${v.id}')"
@@ -5027,8 +5152,71 @@ class DisciplineApp {
     this.pendingImportData = null;
   }
 
+  findMatchingSheetName(workbook, emuWeek) {
+    if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) return null;
+    const names = workbook.SheetNames;
+    const wStr = String(emuWeek);
+    const wPad = String(emuWeek).padStart(2, '0');
+
+    // 1. Khớp chính xác tên số tuần: "8" hoặc "08"
+    const exactNum = names.find(s => s.trim() === wStr || s.trim() === wPad);
+    if (exactNum) return exactNum;
+
+    // 2. Khớp các tiền tố tuần: T8, T08, Tuần 8, Tuần 08, Tuan 8, Tuan 08, W8, Week 8, Sheet 8
+    const weekRegex = new RegExp(`^(?:t|tuần|tuan|week|w|sheet)?\\s*0?${wStr}$`, 'i');
+    const prefixMatch = names.find(s => weekRegex.test(s.trim()));
+    if (prefixMatch) return prefixMatch;
+
+    // 3. Tên sheet chứa từ khóa tuần và số tuần: "Thi đua tuần 8", "T8_TongHop", v.v.
+    const containWeekRegex = new RegExp(`(?:t|tuần|tuan|week|w)\\s*0?${wStr}\\b`, 'i');
+    const containMatch = names.find(s => containWeekRegex.test(s));
+    if (containMatch) return containMatch;
+
+    // 4. Tìm sheet chứa từ khóa THIDUA / MAU_
+    const thiDuaMatch = names.find(s => {
+      const u = s.toUpperCase();
+      return u.includes('THIDUA') || u.includes('THI ĐUA') || u.includes('MAU_') || u.includes('TONGHOP') || u.includes('TỔNG HỢP');
+    });
+    if (thiDuaMatch) return thiDuaMatch;
+
+    // 5. Nếu có nhiều sheet, quét từng sheet để tìm sheet nào chứa nhiều lớp của trường nhất
+    let bestSheet = names[0];
+    let maxMatches = -1;
+    for (const sName of names) {
+      const sheet = workbook.Sheets[sName];
+      if (!sheet) continue;
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      let matches = 0;
+      for (let r = 0; r < Math.min(rows.length, 45); r++) {
+        const row = rows[r];
+        if (!Array.isArray(row)) continue;
+        for (let c = 0; c < Math.min(row.length, 5); c++) {
+          const norm = this.normalizeClassName(String(row[c] || '').trim());
+          if ((window.DEFAULT_CLASSES || []).some(cls => cls.class === norm)) {
+            matches++;
+            break;
+          }
+        }
+      }
+      if (matches > maxMatches) {
+        maxMatches = matches;
+        bestSheet = sName;
+      }
+    }
+
+    return bestSheet;
+  }
+
   handleExcelEmulationImport(file) {
     if (!file) return;
+    const fileName = (file.name || '').toLowerCase();
+    
+    // Nếu là file PDF, chuyển xử lý sang module PDF
+    if (fileName.endsWith('.pdf')) {
+      this.handlePdfEmulationImport(file);
+      return;
+    }
+
     if (typeof XLSX === 'undefined') {
       this.showToast('Thư viện XLSX chưa sẵn sàng!', 'error');
       return;
@@ -5047,214 +5235,24 @@ class DisciplineApp {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         
-        // Tìm sheet dữ liệu phù hợp
-        let targetSheetName = workbook.SheetNames[0];
-        for (const sName of workbook.SheetNames) {
-          const sUpper = sName.toUpperCase();
-          if (sUpper.includes('THIDUA') || sUpper.includes('MAU_') || sUpper.includes('THI ĐUA')) {
-            targetSheetName = sName;
-            break;
-          }
-        }
+        this.pendingWorkbook = workbook;
+        this.pendingImportFile = file;
+
+        // Tự động tìm sheet phù hợp nhất với Tuần hiện tại (ví dụ: Tuần 8 -> tìm sheet "8", "T8", "Tuần 8"...)
+        const targetSheetName = this.findMatchingSheetName(workbook, emuWeek);
         const sheet = workbook.Sheets[targetSheetName];
         if (!sheet) {
-          this.showToast('Không tìm thấy sheet dữ liệu trong file Excel!', 'error');
+          this.showToast(`Không tìm thấy sheet dữ liệu phù hợp trong file Excel!`, 'error');
           return;
         }
 
-        // Đọc tất cả hàng, giữ nguyên ô rỗng dạng chuỗi rỗng
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
         if (!rows || rows.length === 0) {
-          this.showToast('File Excel trống hoặc không có dữ liệu!', 'warning');
+          this.showToast(`Sheet "${targetSheetName}" trong file Excel trống hoặc không có dữ liệu!`, 'warning');
           return;
         }
 
-        // 1. Quét tìm hàng tiêu đề (Header row)
-        let headerRowIdx = -1;
-        let colClass = -1, colGvcn = -1, colShl = -1, colTot = -1, colA = -1, colB = -1, colC = -1, colD = -1;
-        let colDiem15 = -1, colVang = -1, colBonus = -1, colNote = -1;
-
-        const cleanStr = (v) => {
-          return String(v || '').toLowerCase()
-            .normalize('NFD').replace(/[̀-ͯ]/g, '')
-            .replace(/[^a-z0-9]/g, '');
-        };
-
-        for (let r = 0; r < Math.min(rows.length, 15); r++) {
-          const row = rows[r];
-          if (!Array.isArray(row)) continue;
-          for (let c = 0; c < row.length; c++) {
-            const val = cleanStr(row[c]);
-            if (val === 'lop' || val === 'class' || val === 'tenlop') {
-              headerRowIdx = r;
-              colClass = c;
-              break;
-            }
-          }
-          if (headerRowIdx !== -1) break;
-        }
-
-        if (headerRowIdx !== -1) {
-          const hRow = rows[headerRowIdx];
-          const prevRow = headerRowIdx > 0 ? rows[headerRowIdx - 1] : [];
-          
-          for (let c = 0; c < hRow.length; c++) {
-            if (c === colClass) continue;
-            const hVal = cleanStr(hRow[c]);
-            const pVal = cleanStr(prevRow[c] || '');
-
-            if (colGvcn === -1 && (hVal.includes('gvcn') || hVal.includes('chunhiem') || hVal === 'gv')) {
-              colGvcn = c;
-            } else if (colShl === -1 && (hVal.includes('shl') || hVal.includes('sinhhoat'))) {
-              colShl = c;
-            } else if (colTot === -1 && (hVal.includes('tot') || hVal.includes('15d'))) {
-              colTot = c;
-            } else if (colA === -1 && (hVal === 'a' || hVal.includes('gioa') || hVal === '10d')) {
-              colA = c;
-            } else if (colB === -1 && (hVal === 'b' || hVal.includes('giob') || hVal === '5d')) {
-              colB = c;
-            } else if (colC === -1 && (hVal === 'c' || hVal.includes('gioc') || hVal === '0d')) {
-              colC = c;
-            } else if (colD === -1 && (hVal === 'd' || hVal.includes('giod') || hVal === '-5d' || hVal === 'tru5d')) {
-              colD = c;
-            } else if (colDiem15 === -1 && (hVal === '15' || hVal === '15phut' || hVal.includes('diem15') || (hVal.includes('15') && !hVal.includes('15d')))) {
-              colDiem15 = c;
-            } else if (colVang === -1 && (hVal.includes('vang') || (hVal === 'tong' && pVal.includes('vang')))) {
-              colVang = c;
-            } else if (colBonus === -1 && (hVal.includes('cong') || hVal.includes('diemcong') || hVal.includes('bonus'))) {
-              colBonus = c;
-            } else if (colNote === -1 && (hVal.includes('ghichu') || hVal.includes('note') || hVal.includes('lydo'))) {
-              colNote = c;
-            }
-          }
-        }
-
-        // Fallback định vị cột theo cấu trúc file mẫu chuẩn nếu không nhận diện đủ qua tiêu đề
-        if (colClass === -1) colClass = 1;
-        if (colTot === -1) colTot = 4;
-        if (colA === -1) colA = 5;
-        if (colB === -1) colB = 6;
-        if (colC === -1) colC = 7;
-        if (colD === -1) colD = 8;
-        if (colDiem15 === -1) colDiem15 = (rows[0] && rows[0].length >= 20) ? 12 : 9;
-        if (colVang === -1) colVang = (rows[0] && rows[0].length >= 20) ? 16 : 10;
-        if (colBonus === -1 && rows[0] && rows[0].length < 20) colBonus = 11;
-
-        const defaultClasses = window.DEFAULT_CLASSES || [];
-        const parsedClasses = {};
-        const parsedBonuses = [];
-        let totalLessons = 0;
-        let totalAbsences = 0;
-
-        // Quét dữ liệu từng dòng
-        rows.forEach((row, rIdx) => {
-          if (!Array.isArray(row) || rIdx === headerRowIdx) return;
-          
-          let matchedClass = null;
-          const candidateVal = String(row[colClass] || '').trim().toUpperCase();
-          matchedClass = defaultClasses.find(c => c.class.toUpperCase() === candidateVal);
-
-          if (!matchedClass) {
-            for (let c = 0; c < Math.min(row.length, 5); c++) {
-              const testVal = String(row[c] || '').trim().toUpperCase();
-              matchedClass = defaultClasses.find(c => c.class.toUpperCase() === testVal);
-              if (matchedClass) break;
-            }
-          }
-
-          if (matchedClass) {
-            const cName = matchedClass.class;
-            
-            const parseNum = (val, defaultVal = 0) => {
-              if (val === undefined || val === null || val === '') return defaultVal;
-              const n = parseFloat(val);
-              return isNaN(n) ? defaultVal : n;
-            };
-
-            const parsePositiveInt = (val, defaultVal = 0) => {
-              const n = parseNum(val, defaultVal);
-              return Math.max(0, Math.round(n));
-            };
-
-            const shl = colShl !== -1 ? parseNum(row[colShl], 0) : 0;
-            const tot = colTot !== -1 ? parsePositiveInt(row[colTot], 0) : 0;
-            const gioA = colA !== -1 ? parsePositiveInt(row[colA], 27) : 27;
-            const gioB = colB !== -1 ? parsePositiveInt(row[colB], 0) : 0;
-            const gioC = colC !== -1 ? parsePositiveInt(row[colC], 0) : 0;
-            const gioD = colD !== -1 ? parsePositiveInt(row[colD], 0) : 0;
-            const diem15 = colDiem15 !== -1 ? Math.min(10.0, Math.max(0, parseNum(row[colDiem15], 10.0))) : 10.0;
-            const hsVang = colVang !== -1 ? parsePositiveInt(row[colVang], 0) : 0;
-            const bonus = colBonus !== -1 ? parseNum(row[colBonus], 0) : 0;
-            const note = colNote !== -1 ? String(row[colNote] || '').trim() : '';
-
-            const tongTiet = tot + gioA + gioB + gioC + gioD;
-            const diemTbHocTap = tongTiet > 0 
-              ? ((tot * 15) + (gioA * 10) + (gioB * 5) + (gioC * 0) + (gioD * -5)) / tongTiet 
-              : 10.0;
-            
-            const existingWeek = this.emulationWeeks[emuWeek];
-            const existingClass = (existingWeek && existingWeek.classes && existingWeek.classes[cName]) || {};
-            const diemTru = existingClass.diemTru || 0;
-            const tbNenNep = diem15 - diemTru;
-            const tbChung = ((diemTbHocTap + tbNenNep) / 2) + bonus;
-
-            let xepLoai = 'Kém';
-            if (tbChung >= 9.9) xepLoai = 'X sắc';
-            else if (tbChung >= 8.5) xepLoai = 'Giỏi';
-            else if (tbChung >= 7.0) xepLoai = 'Khá';
-            else if (tbChung >= 5.0) xepLoai = 'T.bình';
-            else if (tbChung >= 3.5) xepLoai = 'Yếu';
-
-            parsedClasses[cName] = {
-              stt: matchedClass.stt,
-              className: cName,
-              gvcn: matchedClass.gvcn,
-              shl, tot, gioA, gioB, gioC, gioD,
-              tongTiet,
-              diemTbHocTap: Math.round(diemTbHocTap * 1000) / 1000,
-              diem15,
-              diemTru,
-              tbNenNep: Math.round(tbNenNep * 100) / 100,
-              hsVang,
-              bonus,
-              tbChung: Math.round(tbChung * 1000) / 1000,
-              xepLoai,
-              note
-            };
-
-            totalLessons += tongTiet;
-            totalAbsences += hsVang;
-
-            if (bonus > 0) {
-              parsedBonuses.push({
-                className: cName,
-                points: bonus,
-                reason: note || 'Import từ file Excel'
-              });
-            }
-          }
-        });
-
-        const classCount = Object.keys(parsedClasses).length;
-        if (classCount === 0) {
-          this.showToast('Không tìm thấy dòng lớp hợp lệ (10A1-12D4) trong file Excel!', 'warning');
-          return;
-        }
-
-        this.pendingImportData = {
-          week: emuWeek,
-          fileName: file.name,
-          classes: parsedClasses,
-          bonuses: parsedBonuses,
-          stats: {
-            totalClasses: classCount,
-            totalLessons,
-            totalAbsences,
-            totalBonusClasses: parsedBonuses.length
-          }
-        };
-
-        this.showImportPreviewModal(this.pendingImportData);
+        this.parseExtractedRowsToEmulationData(rows, emuWeek, file.name, targetSheetName);
 
       } catch (err) {
         this.showToast('Lỗi đọc file Excel: ' + err.message, 'error');
@@ -5264,11 +5262,341 @@ class DisciplineApp {
     reader.readAsArrayBuffer(file);
   }
 
+  switchImportSheet(newSheetName) {
+    if (!this.pendingWorkbook || !this.pendingImportFile || !newSheetName) return;
+    const emuSelect = document.getElementById('emulation-select-week');
+    const emuWeek = emuSelect ? parseInt(emuSelect.value, 10) : (this.pendingImportData ? this.pendingImportData.week : this.currentWeek);
+
+    const sheet = this.pendingWorkbook.Sheets[newSheetName];
+    if (!sheet) {
+      this.showToast(`Không tìm thấy sheet "${newSheetName}"!`, 'error');
+      return;
+    }
+
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+    if (!rows || rows.length === 0) {
+      this.showToast(`Sheet "${newSheetName}" trống hoặc không có dữ liệu!`, 'warning');
+      return;
+    }
+
+    this.parseExtractedRowsToEmulationData(rows, emuWeek, this.pendingImportFile.name, newSheetName);
+    this.showToast(`Đã chuyển sang nạp số liệu từ Sheet "${newSheetName}"!`, 'info');
+  }
+
+  async handlePdfEmulationImport(file) {
+    if (!file) return;
+    if (typeof pdfjsLib === 'undefined') {
+      this.showToast('Thư viện PDF.js chưa sẵn sàng! Vui lòng tải lại trang.', 'error');
+      return;
+    }
+
+    const emuSelect = document.getElementById('emulation-select-week');
+    const emuWeek = emuSelect ? parseInt(emuSelect.value, 10) : this.currentWeek;
+
+    if (this.isWeekLocked(emuWeek)) {
+      this.showToast(`Tuần ${emuWeek} đã được khóa niêm phong. Không thể import dữ liệu!`, 'error');
+      return;
+    }
+
+    this.showToast('Đang đọc và phân tích cấu trúc file PDF...', 'info');
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      const numPages = pdf.numPages;
+
+      const allRows = [];
+
+      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        
+        // Nhóm các text items theo toạ độ dòng Y (y coordinate trong transform[5])
+        const items = textContent.items.map(it => ({
+          str: it.str,
+          x: it.transform[4],
+          y: it.transform[5]
+        })).filter(it => it.str && it.str.trim() !== '');
+
+        // Nhóm các items có Y chênh lệch <= 4.5px vào cùng một hàng
+        const lineGroups = [];
+        items.sort((a, b) => b.y - a.y || a.x - b.x);
+
+        items.forEach(it => {
+          let placed = false;
+          for (const grp of lineGroups) {
+            if (Math.abs(grp.y - it.y) <= 4.5) {
+              grp.items.push(it);
+              placed = true;
+              break;
+            }
+          }
+          if (!placed) {
+            lineGroups.push({ y: it.y, items: [it] });
+          }
+        });
+
+        // Sắp xếp các items trong từng hàng theo X tăng dần từ trái sang phải
+        lineGroups.forEach(grp => {
+          grp.items.sort((a, b) => a.x - b.x);
+          const rowTokens = grp.items.map(it => it.str.trim()).filter(Boolean);
+          if (rowTokens.length > 0) {
+            allRows.push(rowTokens);
+          }
+        });
+      }
+
+      this.pendingWorkbook = null;
+      this.pendingImportFile = file;
+
+      this.parseExtractedRowsToEmulationData(allRows, emuWeek, file.name, 'PDF');
+
+    } catch (err) {
+      console.error('Lỗi đọc PDF:', err);
+      this.showToast('Lỗi khi đọc file PDF: ' + (err.message || 'Không thể bóc tách nội dung PDF'), 'error');
+    }
+  }
+
+  parseExtractedRowsToEmulationData(rows, emuWeek, fileName, sheetName = null) {
+    if (!rows || rows.length === 0) {
+      this.showToast('File trống hoặc không tìm thấy dữ liệu!', 'warning');
+      return;
+    }
+
+    const cleanStr = (v) => {
+      return String(v || '').toLowerCase()
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'd')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '');
+    };
+
+    const defaultClasses = window.DEFAULT_CLASSES || [];
+
+    // 1. Tìm dòng lớp đầu tiên để giới hạn vùng Header Rows
+    let firstClassRowIdx = -1;
+    for (let r = 0; r < rows.length; r++) {
+      const row = rows[r];
+      if (!Array.isArray(row)) continue;
+      for (let c = 0; c < row.length; c++) {
+        const norm = this.normalizeClassName(String(row[c] || '').trim());
+        if (defaultClasses.some(cls => cls.class === norm)) {
+          firstClassRowIdx = r;
+          break;
+        }
+      }
+      if (firstClassRowIdx !== -1) break;
+    }
+
+    const startHeader = firstClassRowIdx !== -1 ? Math.max(0, firstClassRowIdx - 2) : 0;
+    const headerEndIdx = firstClassRowIdx !== -1 ? firstClassRowIdx : Math.min(rows.length, 12);
+    const headerRows = rows.slice(startHeader, headerEndIdx);
+    const maxCols = Math.max(...headerRows.map(r => Array.isArray(r) ? r.length : 0), 15);
+
+    // 2. Quét Header đa tầng (hỗ trợ cả header 1 dòng, 2 dòng gộp như Báo cáo tuần)
+    let colClass = -1, colGvcn = -1, colShl = -1, colTot = -1, colA = -1, colB = -1, colC = -1, colD = -1;
+    let colDiem15 = -1, colVang = -1, colBonus = -1, colNote = -1;
+
+    for (let c = 0; c < maxCols; c++) {
+      const colTexts = headerRows.map(r => cleanStr(r[c])).filter(Boolean);
+      const combined = colTexts.join(' ');
+
+      if (colClass === -1 && colTexts.some(t => t === 'lop' || t === 'class' || t === 'tenlop' || t === 'lophoc')) {
+        colClass = c;
+      }
+      if (colTot === -1 && (combined.includes('tot') || combined.includes('15d') || colTexts.some(t => t === 't'))) {
+        colTot = c;
+      }
+      if (colA === -1 && (colTexts.some(t => t === 'a' || t === 'gioa' || t === 'tieta' || t === '10d' || t === 'gioa10d') || combined.includes('gioa') || combined.includes('tieta'))) {
+        colA = c;
+      }
+      if (colB === -1 && (colTexts.some(t => t === 'b' || t === 'giob' || t === 'tietb' || t === '5d' || t === 'giob5d') || combined.includes('giob') || combined.includes('tietb'))) {
+        colB = c;
+      }
+      if (colC === -1 && (colTexts.some(t => t === 'c' || t === 'gioc' || t === 'tietc' || t === '0d' || t === 'gioc0d') || combined.includes('gioc') || combined.includes('tietc'))) {
+        colC = c;
+      }
+      if (colD === -1 && (colTexts.some(t => t === 'd' || t === 'giod' || t === 'tietd' || t === '5d' || t === 'tru5d' || t === 'giod5d') || combined.includes('giod') || combined.includes('tietd'))) {
+        colD = c;
+      }
+      if (colDiem15 === -1 && (combined.includes('15') && !combined.includes('15d') && !combined.includes('tot'))) {
+        colDiem15 = c;
+      }
+      if (colVang === -1 && (combined.includes('vang') || combined.includes('nghi') || (combined.includes('tong') && combined.includes('hs')))) {
+        colVang = c;
+      }
+      if (colBonus === -1 && (combined.includes('cong') || combined.includes('bonus') || combined.includes('thuong'))) {
+        colBonus = c;
+      }
+      if (colShl === -1 && (combined.includes('shl') || combined.includes('sinhhoat') || combined.includes('hdtn'))) {
+        colShl = c;
+      }
+      if (colNote === -1 && (combined.includes('ghichu') || combined.includes('note') || combined.includes('lydo'))) {
+        colNote = c;
+      }
+    }
+
+    // Heuristics chuẩn hoá cho file Báo cáo Tuần (GVCN 2 cột Họ & Tên)
+    if (colTot === 5 && colShl === -1) {
+      colShl = 4;
+    } else if (colTot === 4 && colShl === -1) {
+      colShl = 3;
+    }
+
+    // Fallbacks nếu không quét được qua tiêu đề
+    if (colClass === -1) colClass = 1;
+    if (colTot === -1) colTot = (maxCols >= 20) ? 5 : 4;
+    if (colA === -1) colA = colTot + 1;
+    if (colB === -1) colB = colTot + 2;
+    if (colC === -1) colC = colTot + 3;
+    if (colD === -1) colD = colTot + 4;
+    if (colShl === -1) colShl = colTot > 4 ? 4 : 3;
+    if (colDiem15 === -1) colDiem15 = (maxCols >= 20) ? 13 : 9;
+    if (colVang === -1) colVang = (maxCols >= 20) ? 17 : 10;
+    if (colBonus === -1 && maxCols < 20) colBonus = 11;
+
+    const parsedClasses = {};
+    const parsedBonuses = [];
+    let totalLessons = 0;
+    let totalAbsences = 0;
+
+    const parseNum = (val, defaultVal = 0) => {
+      if (val === undefined || val === null || val === '') return defaultVal;
+      const strVal = String(val).trim().replace(',', '.');
+      const n = parseFloat(strVal);
+      return isNaN(n) ? defaultVal : n;
+    };
+
+    const parsePositiveInt = (val, defaultVal = 0) => {
+      const n = parseNum(val, defaultVal);
+      return Math.max(0, Math.round(n));
+    };
+
+    // 3. Quét số liệu từng dòng lớp
+    const startRow = firstClassRowIdx !== -1 ? firstClassRowIdx : 0;
+    for (let rIdx = startRow; rIdx < rows.length; rIdx++) {
+      const row = rows[rIdx];
+      if (!Array.isArray(row)) continue;
+
+      let matchedClass = null;
+
+      // Thử vị trí colClass
+      if (colClass !== -1 && row[colClass] !== undefined) {
+        const norm = this.normalizeClassName(String(row[colClass] || '').trim());
+        matchedClass = defaultClasses.find(c => c.class === norm);
+      }
+
+      // Thử các ô khác trong 5 cột đầu
+      if (!matchedClass) {
+        for (let c = 0; c < Math.min(row.length, 5); c++) {
+          const norm = this.normalizeClassName(String(row[c] || '').trim());
+          matchedClass = defaultClasses.find(c => c.class === norm);
+          if (matchedClass) break;
+        }
+      }
+
+      // Thử regex trong cả dòng nếu là PDF tokenized line
+      if (!matchedClass) {
+        const lineStr = row.join(' ');
+        const m = lineStr.match(/\b(10B0?[1-9]|10B1[0-1]|11A0?[1-9]|12C0?[1-9])\b/i);
+        if (m) {
+          const norm = this.normalizeClassName(m[1]);
+          matchedClass = defaultClasses.find(c => c.class === norm);
+        }
+      }
+
+      if (matchedClass) {
+        const cName = matchedClass.class;
+
+        const shl = colShl !== -1 ? parseNum(row[colShl], 0) : 0;
+        const tot = colTot !== -1 ? parsePositiveInt(row[colTot], 0) : 0;
+        const gioA = colA !== -1 ? parsePositiveInt(row[colA], 27) : 27;
+        const gioB = colB !== -1 ? parsePositiveInt(row[colB], 0) : 0;
+        const gioC = colC !== -1 ? parsePositiveInt(row[colC], 0) : 0;
+        const gioD = colD !== -1 ? parsePositiveInt(row[colD], 0) : 0;
+        const diem15 = colDiem15 !== -1 ? Math.min(10.0, Math.max(0, parseNum(row[colDiem15], 10.0))) : 10.0;
+        const hsVang = colVang !== -1 ? parsePositiveInt(row[colVang], 0) : 0;
+        const bonus = colBonus !== -1 ? parseNum(row[colBonus], 0) : 0;
+        const note = colNote !== -1 ? String(row[colNote] || '').trim() : '';
+
+        const tongTiet = tot + gioA + gioB + gioC + gioD;
+        const diemTbHocTap = tongTiet > 0 
+          ? ((tot * 15) + (gioA * 10) + (gioB * 5) + (gioC * 0) + (gioD * -5)) / tongTiet 
+          : 10.0;
+        
+        const existingWeek = this.emulationWeeks[emuWeek];
+        const existingClass = (existingWeek && existingWeek.classes && existingWeek.classes[cName]) || {};
+        const diemTru = existingClass.diemTru || 0;
+        const tbNenNep = diem15 - diemTru;
+        const tbChung = ((diemTbHocTap + tbNenNep) / 2) + bonus;
+
+        let xepLoai = 'Kém';
+        if (tbChung >= 9.9) xepLoai = 'X sắc';
+        else if (tbChung >= 8.5) xepLoai = 'Giỏi';
+        else if (tbChung >= 7.0) xepLoai = 'Khá';
+        else if (tbChung >= 5.0) xepLoai = 'T.bình';
+        else if (tbChung >= 3.5) xepLoai = 'Yếu';
+
+        parsedClasses[cName] = {
+          stt: matchedClass.stt,
+          className: cName,
+          gvcn: matchedClass.gvcn,
+          shl, tot, gioA, gioB, gioC, gioD,
+          tongTiet,
+          diemTbHocTap: Math.round(diemTbHocTap * 1000) / 1000,
+          diem15,
+          diemTru,
+          tbNenNep: Math.round(tbNenNep * 100) / 100,
+          hsVang,
+          bonus,
+          tbChung: Math.round(tbChung * 1000) / 1000,
+          xepLoai,
+          note
+        };
+
+        totalLessons += tongTiet;
+        totalAbsences += hsVang;
+
+        if (bonus > 0) {
+          parsedBonuses.push({
+            className: cName,
+            points: bonus,
+            reason: note || `Import từ file ${fileName.endsWith('.pdf') ? 'PDF' : 'Excel'}`
+          });
+        }
+      }
+    }
+
+    const classCount = Object.keys(parsedClasses).length;
+    if (classCount === 0) {
+      this.showToast(`Không tìm thấy dòng lớp hợp lệ (10B01-12C09) trong file!`, 'warning');
+      return;
+    }
+
+    this.pendingImportData = {
+      week: emuWeek,
+      fileName: fileName,
+      sheetName: sheetName,
+      classes: parsedClasses,
+      bonuses: parsedBonuses,
+      stats: {
+        totalClasses: classCount,
+        totalLessons,
+        totalAbsences,
+        totalBonusClasses: parsedBonuses.length
+      }
+    };
+
+    this.showImportPreviewModal(this.pendingImportData);
+  }
+
   showImportPreviewModal(data) {
     if (!data) return;
     const modal = document.getElementById('modal-preview-excel-import');
     if (!modal) return;
 
+    const isPdf = (data.fileName || '').toLowerCase().endsWith('.pdf');
     const titleEl = document.getElementById('preview-import-title');
     const subtitleEl = document.getElementById('preview-import-subtitle');
     const fileInfoEl = document.getElementById('preview-import-fileinfo');
@@ -5279,9 +5607,25 @@ class DisciplineApp {
     const btnConfirmText = document.getElementById('btn-confirm-preview-import-text');
     const tbody = document.getElementById('preview-import-table-body');
 
-    if (titleEl) titleEl.textContent = `Xem Trước Dữ Liệu Import Excel - Tuần ${data.week}`;
+    // Cập nhật Selector chọn Sheet nếu là file Excel nhiều Sheet
+    const sheetSelectorContainer = document.getElementById('container-preview-sheet-selector');
+    const sheetSelectEl = document.getElementById('preview-sheet-select');
+    if (sheetSelectorContainer && sheetSelectEl) {
+      if (this.pendingWorkbook && this.pendingWorkbook.SheetNames && this.pendingWorkbook.SheetNames.length > 1) {
+        sheetSelectorContainer.classList.remove('hidden');
+        sheetSelectEl.innerHTML = this.pendingWorkbook.SheetNames.map(s => 
+          `<option value="${s}" ${s === data.sheetName ? 'selected' : ''}>Sheet: ${s}</option>`
+        ).join('');
+      } else {
+        sheetSelectorContainer.classList.add('hidden');
+      }
+    }
+
+    const sheetTag = data.sheetName && data.sheetName !== 'PDF' ? ` • Sheet: <strong class="text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">${data.sheetName}</strong>` : '';
+
+    if (titleEl) titleEl.textContent = `Xem Trước Dữ Liệu Import ${isPdf ? 'PDF' : 'Excel'} - Tuần ${data.week}`;
     if (subtitleEl) subtitleEl.textContent = `Đối soát số liệu các lớp cho Tuần ${data.week} (${this.getWeekDateRange(data.week)})`;
-    if (fileInfoEl) fileInfoEl.innerHTML = `Tập tin: <strong class="text-slate-800">${data.fileName}</strong> • Đã nhận diện <strong>${data.stats.totalClasses}/29 lớp</strong>`;
+    if (fileInfoEl) fileInfoEl.innerHTML = `Tập tin: <strong class="text-slate-800">${data.fileName}</strong>${sheetTag} • Đã nhận diện <strong>${data.stats.totalClasses}/29 lớp</strong>`;
     
     if (statClassesEl) statClassesEl.textContent = `${data.stats.totalClasses} / 29 lớp`;
     if (statLessonsEl) statLessonsEl.textContent = `${data.stats.totalLessons} tiết`;
@@ -5347,7 +5691,8 @@ class DisciplineApp {
 
   applyPendingImportData() {
     if (!this.pendingImportData) return;
-    const { week, classes, bonuses } = this.pendingImportData;
+    const { week, classes, bonuses, fileName, sheetName } = this.pendingImportData;
+    const isPdf = (fileName || '').toLowerCase().endsWith('.pdf');
 
     if (!this.emulationWeeks[week]) {
       this.emulationWeeks[week] = this.createDefaultWeekData(week);
@@ -5389,7 +5734,9 @@ class DisciplineApp {
     this.updateCharts();
     this.closeImportPreviewModal();
 
-    this.showToast(`Đã áp dụng dữ liệu Excel thành công cho ${updatedCount} lớp trong Tuần ${week}!`, 'success');
+    const srcInfo = sheetName && sheetName !== 'PDF' ? `Sheet "${sheetName}"` : (isPdf ? 'PDF' : 'Excel');
+    this.logAuditAction('IMPORT_EMULATION', `Import ${isPdf ? 'PDF' : 'Excel'} thi đua`, `Đã import số liệu thi đua Tuần ${week} cho ${updatedCount} lớp từ file: ${fileName} (${srcInfo})`, { week, count: updatedCount, file: fileName });
+    this.showToast(`✅ Đã áp dụng thành công dữ liệu ${isPdf ? 'PDF' : 'Excel'} cho ${updatedCount} lớp trong Tuần ${week}!`, 'success');
   }
 
   copyEmulationMarkdown() {
