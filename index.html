@@ -46,6 +46,14 @@
   <!-- Chart.js for Visualizations -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+  <!-- PDF.js for PDF Import Support -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+  </script>
+
   <!-- Custom CSS -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -422,14 +430,26 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5">
-              <!-- Student input with Autocomplete -->
+              <!-- Student input with Autocomplete & Collective Toggle -->
               <div class="md:col-span-5 relative">
-                <label class="block text-xs font-bold text-slate-700 uppercase mb-1">1. Tìm học sinh (gõ tên hoặc lớp):</label>
-                <div class="relative">
+                <div class="flex items-center justify-between mb-1">
+                  <label id="label-manual-student" class="block text-xs font-bold text-slate-700 uppercase">1. Tìm học sinh (gõ tên hoặc lớp):</label>
+                  <label class="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-lg cursor-pointer transition select-none" title="Đánh dấu nếu là vi phạm của cả tập thể lớp (không cần tên học sinh)">
+                    <input type="checkbox" id="chk-collective-violation" class="rounded text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer" onchange="window.app.toggleCollectiveViolation(this.checked)">
+                    <span>Lỗi tập thể (cả lớp)</span>
+                  </label>
+                </div>
+                <div id="container-student-input" class="relative">
                   <input type="text" id="manual-student-input" placeholder="Gõ tên hoặc lớp (VD: An, 10B01, 12C08, Vy...)..."
                          autocomplete="off"
                          class="student-search-input bg-slate-50 border-2 border-slate-300 rounded-xl focus:outline-none focus:border-blue-600 focus:bg-white text-slate-900 font-semibold shadow-xs">
                   <i data-lucide="search" class="w-5 h-5 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none"></i>
+                </div>
+                <!-- Dropdown chọn lớp cho Lỗi tập thể -->
+                <div id="container-collective-class-select" class="relative hidden">
+                  <select id="manual-collective-class-select" class="w-full text-sm font-bold bg-indigo-50/60 border-2 border-indigo-300 rounded-xl focus:outline-none focus:border-indigo-600 focus:bg-white text-indigo-950 p-3.5 shadow-xs">
+                    <option value="">-- Bấm chọn lớp vi phạm (10B01 - 12C09) --</option>
+                  </select>
                 </div>
                 <!-- Autocomplete dropdown -->
                 <div id="autocomplete-list" class="hidden absolute top-full left-0 right-0 mt-1.5 bg-white border-2 border-blue-200 rounded-xl shadow-2xl z-50 max-h-64 overflow-y-auto divide-y divide-slate-100"></div>
@@ -722,14 +742,14 @@
             <span>+ Điểm Cộng TB</span>
           </button>
 
-          <!-- Button Import Excel Tuần -->
-          <button id="btn-open-excel-import" class="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition shadow-xs cursor-pointer">
+          <!-- Button Import Excel / PDF Tuần -->
+          <button id="btn-open-excel-import" class="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition shadow-xs cursor-pointer" title="Import bảng thi đua từ file Excel (.xlsx, .xls) hoặc PDF (.pdf)">
             <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-            <span>📥 Import Excel Tuần</span>
+            <span>📥 Import Excel / PDF</span>
           </button>
           
-          <!-- Hidden File Input for Excel Import -->
-          <input type="file" id="input-emulation-excel-file" accept=".xlsx, .xls, .csv" class="hidden">
+          <!-- Hidden File Input for Excel/PDF Import -->
+          <input type="file" id="input-emulation-excel-file" accept=".xlsx, .xls, .csv, .pdf" class="hidden">
 
           <!-- Button Tải Mẫu Excel Tuần -->
           <button id="btn-download-emulation-template" class="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition cursor-pointer">
@@ -2127,7 +2147,13 @@
         <input type="hidden" id="edit-viol-id">
         
         <div>
-          <label class="block font-bold text-slate-700 mb-1">Họ và Tên Học Sinh <span class="text-rose-500">*</span></label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block font-bold text-slate-700">Họ và Tên Học Sinh <span class="text-rose-500">*</span></label>
+            <label class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 cursor-pointer">
+              <input type="checkbox" id="edit-viol-is-collective" class="rounded text-indigo-600 focus:ring-indigo-500" onchange="window.app.toggleEditCollective(this.checked)">
+              <span>Lỗi tập thể lớp</span>
+            </label>
+          </div>
           <input type="text" id="edit-viol-student" list="edit-viol-students-datalist" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-slate-900" placeholder="Gõ tên học sinh để gợi ý...">
           <datalist id="edit-viol-students-datalist"></datalist>
         </div>
@@ -2144,6 +2170,7 @@
             <select id="edit-viol-gender" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-semibold text-slate-800">
               <option value="Nam">Nam</option>
               <option value="Nữ">Nữ</option>
+              <option value="Tập thể">Tập thể</option>
             </select>
           </div>
         </div>
@@ -2420,19 +2447,32 @@
     <div class="bg-white rounded-2xl max-w-4xl w-full p-6 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col animate-scale-up">
       
       <!-- Modal Header -->
-      <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
             <i data-lucide="file-spreadsheet" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="text-base font-bold text-slate-900" id="preview-import-title">Xem Trước Dữ Liệu Import Excel Thi Đua</h3>
+            <h3 class="text-base font-bold text-slate-900" id="preview-import-title">Xem Trước Dữ Liệu Import Excel / PDF Thi Đua</h3>
             <p class="text-xs text-slate-500" id="preview-import-subtitle">Đối soát số liệu các lớp trước khi áp dụng vào hệ thống</p>
           </div>
         </div>
-        <button id="btn-close-preview-import-modal" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition cursor-pointer">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
+
+        <div class="flex items-center gap-2">
+          <!-- Sheet Selector if Multi-Sheet Excel -->
+          <div id="container-preview-sheet-selector" class="hidden flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 px-2.5 py-1.5 rounded-xl text-xs">
+            <label class="font-bold text-indigo-900 flex items-center gap-1 text-[11px]">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-600"></i>
+              <span>Sheet:</span>
+            </label>
+            <select id="preview-sheet-select" class="bg-white border border-indigo-300 font-bold text-indigo-950 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-indigo-500 cursor-pointer" onchange="window.app.switchImportSheet(this.value)">
+            </select>
+          </div>
+
+          <button id="btn-close-preview-import-modal" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition cursor-pointer">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Quick Metrics Summary Bar -->
